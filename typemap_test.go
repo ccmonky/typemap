@@ -6,53 +6,113 @@ import (
 	"testing"
 
 	"github.com/ccmonky/typemap"
+	"github.com/eko/gocache/v3/cache"
 )
 
-type Struct struct {
+func TestMapStore(t *testing.T) {
+	testTypeMap(t, &typemap.Options{})
+	typ := typemap.GetType[*Gstruct]()
+	assertNotNil(t, typ, "GetType of *Gstruct should not nil")
+	c := typ.InstancesCache().(*cache.Cache[*Gstruct])
+	if c.GetCodec().GetStore().GetType() != "map" {
+		t.Error()
+	}
+}
+
+func TestSyncMapStore(t *testing.T) {
+	syncStore := typemap.NewSyncMap()
+	c := cache.New[*Gstruct](syncStore)
+	options := &typemap.Options{
+		TypeOptions: []typemap.TypeOption{
+			typemap.WithInstancesCache[*Gstruct](c),
+		},
+	}
+	testTypeMap(t, options)
+	typ := typemap.GetType[*Gstruct]()
+	assertNotNil(t, typ, "GetType of *Gstruct should not nil")
+	c = typ.InstancesCache().(*cache.Cache[*Gstruct])
+	if c.GetCodec().GetStore().GetType() != "syncmap" {
+		t.Errorf("should be sync store, got %s", c.GetCodec().GetStore().GetType())
+	}
+}
+
+func TestWithTypeId(t *testing.T) {
+	options := &typemap.Options{
+		TypeOptions: []typemap.TypeOption{
+			typemap.WithTypeId("xxx"),
+		},
+	}
+	testTypeMap(t, options)
+}
+
+func testTypeMap(t *testing.T, options *typemap.Options) {
+	err := typemap.RegisterType[*Gstruct](options.TypeOptions...)
+	assertNil(t, err, "RegisterType *Gstruct should ok")
+	typeOptions := &typemap.Type{}
+	for _, to := range options.TypeOptions {
+		to(typeOptions)
+	}
+	if typeOptions.TypeId() != "" {
+		m := typemap.Types()
+		if _, ok := m[typeOptions.TypeId()]; !ok {
+			t.Errorf("custom typeid %s should in Types map: %v", typeOptions.TypeId(), m)
+		}
+	}
+	ctx := context.Background()
+	gs, err := typemap.Get[*Gstruct](ctx, "first", options.Options()...)
+	t.Log(gs == nil)
+	assertNotNil(t, err, "Get first should not found error")
+	err = typemap.Register[*Gstruct](ctx, "first", &Gstruct{Abc: "abc"}, options.Options()...)
+	assertNil(t, err, "Register first should not error")
+	gs, err = typemap.Get[*Gstruct](ctx, "first", options.Options()...)
+	assertNil(t, err, "Get first again should not error")
+	assertNotNil(t, gs, "Get first again should not nil")
+	if gs.Abc != "abc" {
+		t.Error("Get first again Abc should == abc")
+	}
+	err = typemap.Delete[*Gstruct](ctx, "first", options.Options()...)
+	assertNil(t, err, "Delete first should not error")
+	err = typemap.Register[*Gstruct](ctx, "first", &Gstruct{Abc: "abc"}, options.Options()...)
+	assertNil(t, err, "Register first again should not error")
+	err = typemap.Register[*Gstruct](ctx, "second", &Gstruct{Abc: "def"}, options.Options()...)
+	assertNil(t, err, "Register second should not error")
+	gs, err = typemap.Get[*Gstruct](ctx, "first", options.Options()...)
+	assertNil(t, err, "Get first after re-register should not error")
+	assertNotNil(t, gs, "Get first after re-register should not nil")
+	if gs.Abc != "abc" {
+		t.Error("Get first after re-register Abc should == abc")
+	}
+	gs, err = typemap.Get[*Gstruct](ctx, "second", options.Options()...)
+	assertNil(t, err, "Get second should not error")
+	assertNotNil(t, gs, "Get second should not nil")
+	if gs.Abc != "def" {
+		t.Error("Get second Abc should == abc")
+	}
+}
+
+func assertNil(t *testing.T, v any, msg string) {
+	if v != nil {
+		t.Fatalf("%s: %v", msg, v)
+	}
+}
+
+func assertNotNil(t *testing.T, v any, msg string) {
+	if v == nil {
+		t.Fatalf("%s", msg)
+	}
+}
+
+type Gstruct struct {
 	Abc string
 }
 
-func TestTypeMap(t *testing.T) {
-	err := typemap.RegisterType[*Struct]()
-	if err != nil {
-		t.Fatal("register type *gstruct err")
-	}
-	ctx := context.Background()
-	gs, err := typemap.Get[*Struct](ctx, "first")
-	if err == nil {
-		t.Fatal("should got not found error")
-	}
-	t.Log(err.Error())
-	if gs != nil {
-		t.Fatal("gs should be nil")
-	}
-	err = typemap.Register[*Struct](ctx, "first", &Struct{Abc: "abc"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	gs, err = typemap.Get[*Struct](ctx, "first")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if gs == nil {
-		t.Fatal("gs should not be nil")
-	}
-	if gs.Abc != "abc" {
-		t.Fatal("should ==")
-	}
-}
-
-type gstruct struct {
-	abc string
-}
-
-type gface interface {
+type Gface interface {
 	hello()
 }
 
-type gfunc func() any
+type Gfunc func() any
 
-type gmap map[string]any
+type Gmap map[string]any
 
 type Int int8
 
@@ -62,32 +122,32 @@ func TestTypeId(t *testing.T) {
 		expect string
 	}{
 		{
-			typeId: typemap.GetTypeId[*gstruct](),
-			expect: "github.com/ccmonky/typemap_test.*gstruct",
+			typeId: typemap.GetTypeId[*Gstruct](),
+			expect: "github.com/ccmonky/typemap_test.*Gstruct",
 		},
 		{
-			typeId: typemap.GetTypeId[gstruct](),
-			expect: "github.com/ccmonky/typemap_test.gstruct",
+			typeId: typemap.GetTypeId[Gstruct](),
+			expect: "github.com/ccmonky/typemap_test.Gstruct",
 		},
 		{
-			typeId: typemap.GetTypeId[gface](),
-			expect: "github.com/ccmonky/typemap_test.gface",
+			typeId: typemap.GetTypeId[Gface](),
+			expect: "github.com/ccmonky/typemap_test.Gface",
 		},
 		{
-			typeId: typemap.GetTypeId[*gface](),
-			expect: "github.com/ccmonky/typemap_test.gface",
+			typeId: typemap.GetTypeId[*Gface](),
+			expect: "github.com/ccmonky/typemap_test.Gface",
 		},
 		{
-			typeId: typemap.GetTypeId[gfunc](),
-			expect: "github.com/ccmonky/typemap_test.gfunc",
+			typeId: typemap.GetTypeId[Gfunc](),
+			expect: "github.com/ccmonky/typemap_test.Gfunc",
 		},
 		{
 			typeId: typemap.GetTypeId[Int](),
 			expect: "github.com/ccmonky/typemap_test.Int",
 		},
 		{
-			typeId: typemap.GetTypeId[gmap](),
-			expect: "github.com/ccmonky/typemap_test.gmap",
+			typeId: typemap.GetTypeId[Gmap](),
+			expect: "github.com/ccmonky/typemap_test.Gmap",
 		},
 		{
 			typeId: typemap.GetTypeId[int](),
@@ -126,7 +186,7 @@ func TestTypeId(t *testing.T) {
 			expect: "http.HandlerFunc",
 		},
 		{
-			typeId: typemap.GetTypeId[map[string]*gstruct](),
+			typeId: typemap.GetTypeId[map[string]*Gstruct](),
 			expect: "map[string]", // FIXME
 		},
 		{

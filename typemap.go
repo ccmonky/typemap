@@ -8,9 +8,19 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/eko/gocache/v3/cache"
 	"github.com/eko/gocache/v3/store"
+)
+
+const (
+	// For use with functions that take an expiration time.
+	NoExpiration time.Duration = -1
+	// For use with functions that take an expiration time. Equivalent to
+	// passing in the same expiration duration as was given to New() or
+	// NewFrom() when the cache was created (e.g. 5 minutes.)
+	DefaultExpiration time.Duration = 0
 )
 
 // RegisterType register a *Type into global TypeMap, if exists return error
@@ -46,7 +56,7 @@ func setType[T any](typeId string, opts ...TypeOption) error {
 	}
 	typeMap.lock.Lock()
 	defer typeMap.lock.Unlock()
-	typeMap.types[typeId] = typ
+	typeMap.types[typ.typeId] = typ
 	return nil
 }
 
@@ -76,6 +86,18 @@ type Type struct { // FIXME: 带泛型参数？
 	typeId         string
 	instancesCache any // cache.CacheInterface: cannot use generic type cache.CacheInterface[T any] without instantiation
 	dependencies   []string
+}
+
+func (typ Type) TypeId() string {
+	return typ.typeId
+}
+
+func (typ Type) InstancesCache() any {
+	return typ.instancesCache
+}
+
+func (typ Type) Dependencies() []string {
+	return typ.dependencies
 }
 
 // MarshalJSON ...
@@ -202,15 +224,26 @@ type Options struct {
 	StoreOptions []store.Option
 }
 
+func (options *Options) Options() []Option {
+	var opts []Option
+	for _, to := range options.TypeOptions {
+		opts = append(opts, WithTypeOption(to))
+	}
+	for _, so := range options.StoreOptions {
+		opts = append(opts, WithStoreOption(so))
+	}
+	return opts
+}
+
 type Option func(*Options)
 
-func WithTypeOptions(typeOption TypeOption) Option {
+func WithTypeOption(typeOption TypeOption) Option {
 	return func(options *Options) {
 		options.TypeOptions = append(options.TypeOptions, typeOption)
 	}
 }
 
-func WithStoreOptions(storeOption store.Option) Option {
+func WithStoreOption(storeOption store.Option) Option {
 	return func(options *Options) {
 		options.StoreOptions = append(options.StoreOptions, storeOption)
 	}
@@ -219,7 +252,7 @@ func WithStoreOptions(storeOption store.Option) Option {
 func getInstancesCache[T any](opts ...TypeOption) (cache.CacheInterface[T], error) {
 	typ := GetType[T](opts...)
 	if typ == nil {
-		return nil, fmt.Errorf("type %s not found", typ.typeId)
+		return nil, fmt.Errorf("type %s not found", GetTypeId[T]())
 	}
 	cache, ok := typ.instancesCache.(cache.CacheInterface[T])
 	if !ok {
@@ -262,6 +295,7 @@ type TypeMap struct {
 	lock  sync.RWMutex
 }
 
+// global TypeMap
 var typeMap = &TypeMap{
 	types: make(map[string]*Type),
 }

@@ -10,17 +10,8 @@ import (
 )
 
 const (
-	// For use with functions that take an expiration time.
-	NoExpiration time.Duration = -1
-	// For use with functions that take an expiration time. Equivalent to
-	// passing in the same expiration duration as was given to New() or
-	// NewFrom() when the cache was created (e.g. 5 minutes.)
-	DefaultExpiration time.Duration = 0
-)
-
-const (
 	// MapType represents the storage type as a string value
-	MapType = "map" // go-cache
+	MapType = "map"
 	// MapTagPattern represents the tag pattern to be used as a key in specified storage
 	MapTagPattern = "map_tag_%s"
 )
