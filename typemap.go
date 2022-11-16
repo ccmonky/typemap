@@ -19,12 +19,7 @@ import (
 //   default to `cache.New[T](NewMap())`
 // - can specify T's dependencies(a slice of TypeId) with `WithDependencies`
 func RegisterType[T any](opts ...TypeOption) error {
-	typ := &Type{
-		typeId: GetTypeId[T](),
-	}
-	for _, opt := range opts {
-		opt(typ)
-	}
+	typ := newType[T](opts...)
 	if getType(typ.typeId) != nil {
 		return fmt.Errorf("type %s already registered", typ.typeId)
 	}
@@ -37,12 +32,7 @@ func RegisterType[T any](opts ...TypeOption) error {
 //   default to `cache.New(NewMap())`
 // - can specify T's dependencies(a slice of TypeId) with `WithDependencies`
 func SetType[T any](opts ...TypeOption) error {
-	typ := &Type{
-		typeId: GetTypeId[T](),
-	}
-	for _, opt := range opts {
-		opt(typ)
-	}
+	typ := newType[T](opts...)
 	return setType[T](typ)
 }
 
@@ -63,12 +53,7 @@ func Types() map[string]*Type {
 
 // GetType get *Type corresponding to T from global TypeMap
 func GetType[T any](opts ...TypeOption) *Type {
-	typ := &Type{
-		typeId: GetTypeId[T](),
-	}
-	for _, opt := range opts {
-		opt(typ)
-	}
+	typ := newType[T](opts...)
 	return getType(typ.typeId)
 }
 
@@ -76,6 +61,17 @@ func getType(typeId string) *Type {
 	typeMap.lock.RLock()
 	defer typeMap.lock.RUnlock()
 	return typeMap.types[typeId]
+}
+
+func newType[T any](opts ...TypeOption) *Type {
+	typ := &Type{}
+	for _, opt := range opts {
+		opt(typ)
+	}
+	if typ.typeId == "" {
+		typ.typeId = GetTypeId[T]()
+	}
+	return typ
 }
 
 type Type struct {
@@ -149,10 +145,7 @@ func WithDependencies(dependencies []string) TypeOption {
 
 // Get get instance of T from Type's instances cache
 func Get[T any](ctx context.Context, key any, opts ...Option) (T, error) {
-	options := &Options{}
-	for _, opt := range opts {
-		opt(options)
-	}
+	options := NewOptions(opts...)
 	cache, err := getInstancesCache[T](options.TypeOptions...)
 	if err != nil {
 		return *new(T), err
@@ -162,10 +155,7 @@ func Get[T any](ctx context.Context, key any, opts ...Option) (T, error) {
 
 // Register register a T instance into Type's instances cache, if exists return error
 func Register[T any](ctx context.Context, key any, object T, opts ...Option) error {
-	options := &Options{}
-	for _, opt := range opts {
-		opt(options)
-	}
+	options := NewOptions(opts...)
 	cache, err := getInstancesCache[T](options.TypeOptions...)
 	if err != nil {
 		return err
@@ -180,10 +170,7 @@ func Register[T any](ctx context.Context, key any, object T, opts ...Option) err
 
 // Set set a T instance into Type's instances cache, if exists then override it
 func Set[T any](ctx context.Context, key any, object T, opts ...Option) error { // options ...store.Option
-	options := &Options{}
-	for _, opt := range opts {
-		opt(options)
-	}
+	options := NewOptions(opts...)
 	cache, err := getInstancesCache[T](options.TypeOptions...)
 	if err != nil {
 		return err
@@ -193,10 +180,7 @@ func Set[T any](ctx context.Context, key any, object T, opts ...Option) error { 
 
 // Delete delete a T instance specified by key
 func Delete[T any](ctx context.Context, key any, opts ...Option) error {
-	options := &Options{}
-	for _, opt := range opts {
-		opt(options)
-	}
+	options := NewOptions(opts...)
 	cache, err := getInstancesCache[T](options.TypeOptions...)
 	if err != nil {
 		return err
@@ -206,15 +190,20 @@ func Delete[T any](ctx context.Context, key any, opts ...Option) error {
 
 // Clear clear T's instances cache
 func Clear[T any](ctx context.Context, opts ...Option) error {
-	options := &Options{}
-	for _, opt := range opts {
-		opt(options)
-	}
+	options := NewOptions(opts...)
 	cache, err := getInstancesCache[T](options.TypeOptions...)
 	if err != nil {
 		return err
 	}
 	return cache.Clear(ctx)
+}
+
+func NewOptions(opts ...Option) *Options {
+	options := &Options{}
+	for _, opt := range opts {
+		opt(options)
+	}
+	return options
 }
 
 // Options control options for TypeMap's instances api, Register|Set|Get|Delete|Clear
