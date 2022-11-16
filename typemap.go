@@ -28,11 +28,16 @@ const (
 // - can specify instances cache container with `WithInstancesCache`, which use `github.com/eko/gocache` interface
 //   default to `cache.New(mapStore)`
 func RegisterType[T any](opts ...TypeOption) error {
-	typeId := GetTypeId[T]()
-	if getType(typeId) != nil {
-		return fmt.Errorf("type %s already registered", typeId)
+	typ := &Type{
+		typeId: GetTypeId[T](),
 	}
-	return setType[T](typeId, opts...)
+	for _, opt := range opts {
+		opt(typ)
+	}
+	if getType(typ.typeId) != nil {
+		return fmt.Errorf("type %s already registered", typ.typeId)
+	}
+	return setType[T](typ)
 }
 
 // SetType register a *Type into global TypeMap, if exists then override it
@@ -40,17 +45,16 @@ func RegisterType[T any](opts ...TypeOption) error {
 // - can specify instances cache container with `WithInstancesCache`, which use `github.com/eko/gocache` interface
 //   default to `cache.New(mapStore)`
 func SetType[T any](opts ...TypeOption) error {
-	typeId := GetTypeId[T]()
-	return setType[T](typeId, opts...)
-}
-
-func setType[T any](typeId string, opts ...TypeOption) error {
 	typ := &Type{
-		typeId: typeId,
+		typeId: GetTypeId[T](),
 	}
 	for _, opt := range opts {
 		opt(typ)
 	}
+	return setType[T](typ)
+}
+
+func setType[T any](typ *Type) error {
 	if typ.instancesCache == nil {
 		typ.instancesCache = cache.New[T](NewMap())
 	}
@@ -277,10 +281,11 @@ func GetTypeId[T any]() string {
 	switch typ.Kind() {
 	case reflect.Interface:
 		return pkgPath + "." + typeName
-	case reflect.Map:
-		return "map[" + typ.Key().Name() + "]" + typ.Elem().Name() // FIXME: any & custom type!
-	case reflect.Array, reflect.Slice:
-		return "[]" + typ.Elem().Name() // FIXME: any & custom type!
+	case reflect.Map, reflect.Array, reflect.Slice:
+		if pkgPath != "" { // NOTE: e.g. custom map
+			return pkgPath + "." + typeName
+		}
+		return fmt.Sprintf("%T", *pointer)
 	default:
 		if pkgPath == "" {
 			return strings.Repeat("*", level) + typeName

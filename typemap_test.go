@@ -10,10 +10,12 @@ import (
 )
 
 func TestMapStore(t *testing.T) {
-	testTypeMap(t, &typemap.Options{})
-	typ := typemap.GetType[*Gstruct]()
-	assertNotNil(t, typ, "GetType of *Gstruct should not nil")
-	c := typ.InstancesCache().(*cache.Cache[*Gstruct])
+	first := &StructMap{Abc: "abc"}
+	second := &StructMap{Abc: "def"}
+	testTypeMap[*StructMap](t, first, second, &typemap.Options{})
+	typ := typemap.GetType[*StructMap]()
+	assertNotNil(t, typ, "GetType of *StructMap should not nil")
+	c := typ.InstancesCache().(*cache.Cache[*StructMap])
 	if c.GetCodec().GetStore().GetType() != "map" {
 		t.Error()
 	}
@@ -21,16 +23,18 @@ func TestMapStore(t *testing.T) {
 
 func TestSyncMapStore(t *testing.T) {
 	syncStore := typemap.NewSyncMap()
-	c := cache.New[*Gstruct](syncStore)
+	c := cache.New[*StructSyncMap](syncStore)
 	options := &typemap.Options{
 		TypeOptions: []typemap.TypeOption{
-			typemap.WithInstancesCache[*Gstruct](c),
+			typemap.WithInstancesCache[*StructSyncMap](c),
 		},
 	}
-	testTypeMap(t, options)
-	typ := typemap.GetType[*Gstruct]()
-	assertNotNil(t, typ, "GetType of *Gstruct should not nil")
-	c = typ.InstancesCache().(*cache.Cache[*Gstruct])
+	first := &StructSyncMap{Abc: "abc"}
+	second := &StructSyncMap{Abc: "def"}
+	testTypeMap[*StructSyncMap](t, first, second, options)
+	typ := typemap.GetType[*StructSyncMap]()
+	assertNotNil(t, typ, "GetType of *StructSyncMap should not nil")
+	c = typ.InstancesCache().(*cache.Cache[*StructSyncMap])
 	if c.GetCodec().GetStore().GetType() != "syncmap" {
 		t.Errorf("should be sync store, got %s", c.GetCodec().GetStore().GetType())
 	}
@@ -42,12 +46,34 @@ func TestWithTypeId(t *testing.T) {
 			typemap.WithTypeId("xxx"),
 		},
 	}
-	testTypeMap(t, options)
+	first := &StructMap{Abc: "abc"}
+	second := &StructMap{Abc: "def"}
+	testTypeMap[*StructMap](t, first, second, options)
 }
 
-func testTypeMap(t *testing.T, options *typemap.Options) {
-	err := typemap.RegisterType[*Gstruct](options.TypeOptions...)
-	assertNil(t, err, "RegisterType *Gstruct should ok")
+type StructInterface interface {
+	Value() string
+}
+
+type StructMap struct {
+	Abc string
+}
+
+func (sm StructMap) Value() string {
+	return sm.Abc
+}
+
+type StructSyncMap struct {
+	Abc string
+}
+
+func (ssm StructSyncMap) Value() string {
+	return ssm.Abc
+}
+
+func testTypeMap[T StructInterface](t *testing.T, first, second T, options *typemap.Options) {
+	err := typemap.RegisterType[T](options.TypeOptions...)
+	assertNil(t, err, "RegisterType T should ok")
 	typeOptions := &typemap.Type{}
 	for _, to := range options.TypeOptions {
 		to(typeOptions)
@@ -59,33 +85,33 @@ func testTypeMap(t *testing.T, options *typemap.Options) {
 		}
 	}
 	ctx := context.Background()
-	gs, err := typemap.Get[*Gstruct](ctx, "first", options.Options()...)
-	t.Log(gs == nil)
+	gs, err := typemap.Get[T](ctx, "first", options.Options()...)
+	t.Log(gs)
 	assertNotNil(t, err, "Get first should not found error")
-	err = typemap.Register[*Gstruct](ctx, "first", &Gstruct{Abc: "abc"}, options.Options()...)
+	err = typemap.Register[T](ctx, "first", first, options.Options()...)
 	assertNil(t, err, "Register first should not error")
-	gs, err = typemap.Get[*Gstruct](ctx, "first", options.Options()...)
+	gs, err = typemap.Get[T](ctx, "first", options.Options()...)
 	assertNil(t, err, "Get first again should not error")
 	assertNotNil(t, gs, "Get first again should not nil")
-	if gs.Abc != "abc" {
+	if gs.Value() != "abc" {
 		t.Error("Get first again Abc should == abc")
 	}
-	err = typemap.Delete[*Gstruct](ctx, "first", options.Options()...)
+	err = typemap.Delete[T](ctx, "first", options.Options()...)
 	assertNil(t, err, "Delete first should not error")
-	err = typemap.Register[*Gstruct](ctx, "first", &Gstruct{Abc: "abc"}, options.Options()...)
+	err = typemap.Register[T](ctx, "first", first, options.Options()...)
 	assertNil(t, err, "Register first again should not error")
-	err = typemap.Register[*Gstruct](ctx, "second", &Gstruct{Abc: "def"}, options.Options()...)
+	err = typemap.Register[T](ctx, "second", second, options.Options()...)
 	assertNil(t, err, "Register second should not error")
-	gs, err = typemap.Get[*Gstruct](ctx, "first", options.Options()...)
+	gs, err = typemap.Get[T](ctx, "first", options.Options()...)
 	assertNil(t, err, "Get first after re-register should not error")
 	assertNotNil(t, gs, "Get first after re-register should not nil")
-	if gs.Abc != "abc" {
+	if gs.Value() != "abc" {
 		t.Error("Get first after re-register Abc should == abc")
 	}
-	gs, err = typemap.Get[*Gstruct](ctx, "second", options.Options()...)
+	gs, err = typemap.Get[T](ctx, "second", options.Options()...)
 	assertNil(t, err, "Get second should not error")
 	assertNotNil(t, gs, "Get second should not nil")
-	if gs.Abc != "def" {
+	if gs.Value() != "def" {
 		t.Error("Get second Abc should == abc")
 	}
 }
@@ -179,35 +205,35 @@ func TestTypeId(t *testing.T) {
 		},
 		{
 			typeId: typemap.GetTypeId[http.Handler](),
-			expect: "http.Handler",
+			expect: "net/http.Handler",
 		},
 		{
 			typeId: typemap.GetTypeId[http.HandlerFunc](),
-			expect: "http.HandlerFunc",
+			expect: "net/http.HandlerFunc",
 		},
 		{
 			typeId: typemap.GetTypeId[map[string]*Gstruct](),
-			expect: "map[string]", // FIXME
+			expect: "map[string]*typemap_test.Gstruct",
 		},
 		{
 			typeId: typemap.GetTypeId[map[string]any](),
-			expect: "map[string]", // FIXME
+			expect: "map[string]interface {}",
 		},
 		{
 			typeId: typemap.GetTypeId[[]any](),
-			expect: "[]", // FIXME
+			expect: "[]interface {}",
 		},
 	}
 	for _, tc := range cases {
 		if tc.typeId != tc.expect {
-			t.Logf("case %s failed, got %s", tc.expect, tc.typeId)
+			t.Errorf("case %s failed, got %s", tc.expect, tc.typeId)
 		}
 	}
 }
 
-// 100-200 ns
+// 100-150 ns
 func BenchmarkGetTypeId(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		typemap.GetTypeId[map[string]int]()
+		typemap.GetTypeId[Gface]()
 	}
 }
