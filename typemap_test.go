@@ -2,6 +2,7 @@ package typemap_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -9,13 +10,26 @@ import (
 	"github.com/eko/gocache/v3/cache"
 )
 
+func TestType(t *testing.T) {
+	err := typemap.RegisterType[string]()
+	if err != nil {
+		t.Fatal(err)
+	}
+	typ := typemap.GetType[string]()
+	data, err := json.Marshal(typ)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(string(data))
+}
+
 func TestMapStore(t *testing.T) {
 	first := &StructMap{Abc: "abc"}
 	second := &StructMap{Abc: "def"}
 	testTypeMap[*StructMap](t, first, second, &typemap.Options{})
 	typ := typemap.GetType[*StructMap]()
 	assertNotNil(t, typ, "GetType of *StructMap should not nil")
-	c := typ.InstancesCache().(*cache.Cache[*StructMap])
+	c := typ.InstancesCache("").(*cache.Cache[*StructMap])
 	if c.GetCodec().GetStore().GetType() != "map" {
 		t.Error()
 	}
@@ -26,7 +40,7 @@ func TestSyncMapStore(t *testing.T) {
 	c := cache.New[*StructSyncMap](syncStore)
 	options := &typemap.Options{
 		TypeOptions: []typemap.TypeOption{
-			typemap.WithInstancesCache[*StructSyncMap](c),
+			typemap.WithInstancesCache[*StructSyncMap]("", c),
 		},
 	}
 	first := &StructSyncMap{Abc: "abc"}
@@ -34,21 +48,28 @@ func TestSyncMapStore(t *testing.T) {
 	testTypeMap[*StructSyncMap](t, first, second, options)
 	typ := typemap.GetType[*StructSyncMap]()
 	assertNotNil(t, typ, "GetType of *StructSyncMap should not nil")
-	c = typ.InstancesCache().(*cache.Cache[*StructSyncMap])
+	c = typ.InstancesCache("").(*cache.Cache[*StructSyncMap])
 	if c.GetCodec().GetStore().GetType() != "syncmap" {
 		t.Errorf("should be sync store, got %s", c.GetCodec().GetStore().GetType())
 	}
 }
 
-func TestWithTypeId(t *testing.T) {
+func TestWithTag(t *testing.T) {
 	options := &typemap.Options{
 		TypeOptions: []typemap.TypeOption{
-			typemap.WithTypeId("xxx"),
+			typemap.WithInstancesCache[*StructMap]("xxx", nil),
 		},
+		Tag: "xxx",
 	}
 	first := &StructMap{Abc: "abc"}
 	second := &StructMap{Abc: "def"}
 	testTypeMap[*StructMap](t, first, second, options)
+	typ := typemap.GetType[*StructMap]()
+	assertNotNil(t, typ, "GetType of *StructMap should not nil")
+	c := typ.InstancesCache("xxx").(*cache.Cache[*StructMap])
+	if c.GetCodec().GetStore().GetType() != "map" {
+		t.Error()
+	}
 }
 
 type StructInterface interface {
@@ -74,16 +95,6 @@ func (ssm StructSyncMap) Value() string {
 func testTypeMap[T StructInterface](t *testing.T, first, second T, options *typemap.Options) {
 	err := typemap.RegisterType[T](options.TypeOptions...)
 	assertNil(t, err, "RegisterType T should ok")
-	typeOptions := &typemap.Type{}
-	for _, to := range options.TypeOptions {
-		to(typeOptions)
-	}
-	if typeOptions.TypeId() != "" {
-		m := typemap.Types()
-		if _, ok := m[typeOptions.TypeId()]; !ok {
-			t.Errorf("custom typeid %s should in Types map: %v", typeOptions.TypeId(), m)
-		}
-	}
 	ctx := context.Background()
 	gs, err := typemap.Get[T](ctx, "first", options.Options()...)
 	t.Log(gs)
@@ -148,79 +159,99 @@ func TestTypeId(t *testing.T) {
 		expect string
 	}{
 		{
-			typeId: typemap.GetTypeId[*Gstruct](),
-			expect: "github.com/ccmonky/typemap_test.*Gstruct",
+			typeId: typemap.GetTypeIdString[*Gstruct](),
+			expect: "github.com/ccmonky/*typemap_test.Gstruct",
 		},
 		{
-			typeId: typemap.GetTypeId[Gstruct](),
+			typeId: typemap.GetTypeIdString[**Gstruct](),
+			expect: "github.com/ccmonky/**typemap_test.Gstruct",
+		},
+		{
+			typeId: typemap.GetTypeIdString[Gstruct](),
 			expect: "github.com/ccmonky/typemap_test.Gstruct",
 		},
 		{
-			typeId: typemap.GetTypeId[Gface](),
+			typeId: typemap.GetTypeIdString[Gface](),
 			expect: "github.com/ccmonky/typemap_test.Gface",
 		},
 		{
-			typeId: typemap.GetTypeId[*Gface](),
-			expect: "github.com/ccmonky/typemap_test.Gface",
+			typeId: typemap.GetTypeIdString[*Gface](),
+			expect: "github.com/ccmonky/*typemap_test.Gface",
 		},
 		{
-			typeId: typemap.GetTypeId[Gfunc](),
+			typeId: typemap.GetTypeIdString[Gfunc](),
 			expect: "github.com/ccmonky/typemap_test.Gfunc",
 		},
 		{
-			typeId: typemap.GetTypeId[Int](),
+			typeId: typemap.GetTypeIdString[func() Gface](),
+			expect: "func() typemap_test.Gface",
+		},
+		{
+			typeId: typemap.GetTypeIdString[func() *Gface](),
+			expect: "func() *typemap_test.Gface",
+		},
+		{
+			typeId: typemap.GetTypeIdString[Int](),
 			expect: "github.com/ccmonky/typemap_test.Int",
 		},
 		{
-			typeId: typemap.GetTypeId[Gmap](),
+			typeId: typemap.GetTypeIdString[*Int](),
+			expect: "github.com/ccmonky/*typemap_test.Int",
+		},
+		{
+			typeId: typemap.GetTypeIdString[Gmap](),
 			expect: "github.com/ccmonky/typemap_test.Gmap",
 		},
 		{
-			typeId: typemap.GetTypeId[int](),
+			typeId: typemap.GetTypeIdString[*Gmap](),
+			expect: "github.com/ccmonky/*typemap_test.Gmap",
+		},
+		{
+			typeId: typemap.GetTypeIdString[int](),
 			expect: "int",
 		},
 		{
-			typeId: typemap.GetTypeId[float32](),
+			typeId: typemap.GetTypeIdString[float32](),
 			expect: "float32",
 		},
 		{
-			typeId: typemap.GetTypeId[string](),
+			typeId: typemap.GetTypeIdString[string](),
 			expect: "string",
 		},
 		{
-			typeId: typemap.GetTypeId[*string](),
+			typeId: typemap.GetTypeIdString[*string](),
 			expect: "*string",
 		},
 		{
-			typeId: typemap.GetTypeId[**string](),
+			typeId: typemap.GetTypeIdString[**string](),
 			expect: "**string",
 		},
 		{
-			typeId: typemap.GetTypeId[map[string]int](),
+			typeId: typemap.GetTypeIdString[map[string]int](),
 			expect: "map[string]int",
 		},
 		{
-			typeId: typemap.GetTypeId[[]string](),
+			typeId: typemap.GetTypeIdString[[]string](),
 			expect: "[]string",
 		},
 		{
-			typeId: typemap.GetTypeId[http.Handler](),
+			typeId: typemap.GetTypeIdString[http.Handler](),
 			expect: "net/http.Handler",
 		},
 		{
-			typeId: typemap.GetTypeId[http.HandlerFunc](),
+			typeId: typemap.GetTypeIdString[http.HandlerFunc](),
 			expect: "net/http.HandlerFunc",
 		},
 		{
-			typeId: typemap.GetTypeId[map[string]*Gstruct](),
+			typeId: typemap.GetTypeIdString[map[string]*Gstruct](),
 			expect: "map[string]*typemap_test.Gstruct",
 		},
 		{
-			typeId: typemap.GetTypeId[map[string]any](),
+			typeId: typemap.GetTypeIdString[map[string]any](),
 			expect: "map[string]interface {}",
 		},
 		{
-			typeId: typemap.GetTypeId[[]any](),
+			typeId: typemap.GetTypeIdString[[]any](),
 			expect: "[]interface {}",
 		},
 	}
@@ -231,9 +262,8 @@ func TestTypeId(t *testing.T) {
 	}
 }
 
-// 100-150 ns
 func BenchmarkGetTypeId(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		typemap.GetTypeId[Gface]()
+		typemap.GetTypeId[*Gface]()
 	}
 }

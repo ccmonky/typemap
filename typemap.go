@@ -10,143 +10,205 @@ import (
 	"sync"
 
 	"github.com/eko/gocache/v3/cache"
+	"github.com/eko/gocache/v3/codec"
 	"github.com/eko/gocache/v3/store"
 )
 
-// RegisterType register a *Type into global TypeMap, if exists return error
-// - can specify TypeId with `WithTypeId`, or will use the GetTypeId(T) as default
+// RegisterType register a *Type into global TypeMap, if exists then try to update the exist *Type
 // - can specify instances cache container with `WithInstancesCache`, which use `github.com/eko/gocache` interface
-//   default to `cache.New[T](NewMap())`
+//   default to `cache.New[T](NewMap())`, if tag cache exists then return already eixsts error
 // - can specify T's dependencies(a slice of TypeId) with `WithDependencies`
 func RegisterType[T any](opts ...TypeOption) error {
-	typ := newType[T](opts...)
-	if getType(typ.typeId) != nil {
-		return fmt.Errorf("type %s already registered", typ.typeId)
+	typeId := GetTypeId[T]()
+	options := &TypeOptions{}
+	for _, opt := range opts {
+		opt(options)
 	}
-	return setType[T](typ)
+	var needSetType bool
+	typeMap.lock.Lock()
+	defer typeMap.lock.Unlock()
+	typ := typeMap.types[typeId]
+	if typ == nil {
+		needSetType = true
+		typ = &Type{
+			typeId:         typeId,
+			instancesCache: options.InstancesCache,
+			dependencies:   options.Dependencies,
+		}
+	} else {
+		typ.lock.Lock()
+		if options.UseDependencies {
+			typ.dependencies = options.Dependencies
+			needSetType = true
+		}
+		for tag, tagCache := range options.InstancesCache {
+			if _, ok := typ.instancesCache[tag]; ok {
+				typ.lock.Unlock()
+				return fmt.Errorf("type %s tag cache %s already exists", typ.String(), tag)
+			}
+			typ.instancesCache[tag] = tagCache
+			needSetType = true
+		}
+		typ.lock.Unlock()
+	}
+	if needSetType {
+		setType[T](typ)
+	}
+	return nil
 }
 
 // SetType register a *Type into global TypeMap, if exists then override it
-// - can specify TypeId with `WithTypeId`, or will use the GetTypeId(T) as default
 // - can specify instances cache container with `WithInstancesCache`, which use `github.com/eko/gocache` interface
 //   default to `cache.New(NewMap())`
 // - can specify T's dependencies(a slice of TypeId) with `WithDependencies`
 func SetType[T any](opts ...TypeOption) error {
-	typ := newType[T](opts...)
+	options := &TypeOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+	typeMap.lock.Lock()
+	defer typeMap.lock.Unlock()
+	typ := &Type{
+		typeId:         GetTypeId[T](),
+		instancesCache: options.InstancesCache,
+		dependencies:   options.Dependencies,
+	}
 	return setType[T](typ)
 }
 
 func setType[T any](typ *Type) error {
+	typ.lock.Lock()
 	if typ.instancesCache == nil {
-		typ.instancesCache = cache.New[T](NewMap())
+		typ.instancesCache = make(map[string]any)
+		typ.instancesCache[""] = cache.New[T](NewMap()) // NOTE: default tag is ""
 	}
-	typeMap.lock.Lock()
-	defer typeMap.lock.Unlock()
+	for tag, tagCache := range typ.instancesCache {
+		if tagCache == nil {
+			typ.instancesCache[tag] = cache.New[T](NewMap())
+		}
+	}
+	typ.lock.Unlock()
 	typeMap.types[typ.typeId] = typ
 	return nil
 }
 
 // Types returns all Types
-func Types() map[string]*Type {
+func Types() map[reflect.Type]*Type {
 	return typeMap.types
 }
 
 // GetType get *Type corresponding to T from global TypeMap
-func GetType[T any](opts ...TypeOption) *Type {
-	typ := newType[T](opts...)
-	return getType(typ.typeId)
-}
-
-func getType(typeId string) *Type {
+func GetType[T any]() *Type {
 	typeMap.lock.RLock()
 	defer typeMap.lock.RUnlock()
-	return typeMap.types[typeId]
+	return typeMap.types[GetTypeId[T]()]
 }
 
-func newType[T any](opts ...TypeOption) *Type {
-	typ := &Type{}
-	for _, opt := range opts {
-		opt(typ)
-	}
-	if typ.typeId == "" {
-		typ.typeId = GetTypeId[T]()
-	}
-	return typ
-}
+// func getType(typeId reflect.Type) *Type {
+// 	typeMap.lock.RLock()
+// 	defer typeMap.lock.RUnlock()
+// 	return typeMap.types[typeId]
+// }
 
 type Type struct {
-	typeId         string
-	instancesCache any // cache.CacheInterface: cannot use generic type cache.CacheInterface[T any] without instantiation
+	typeId         reflect.Type
 	dependencies   []string
+	instancesCache map[tag]any // cache.CacheInterface: cannot use generic type cache.CacheInterface[T any] without instantiation
+	lock           sync.RWMutex
 }
 
-func (typ Type) TypeId() string {
+type tag = string
+
+func (typ *Type) TypeId() reflect.Type {
 	return typ.typeId
 }
 
-func (typ Type) InstancesCache() any {
-	return typ.instancesCache
+func (typ *Type) String() string {
+	return typeIdString(typ.typeId)
 }
 
-func (typ Type) Dependencies() []string {
+func (typ *Type) PkgPath() string {
+	return typeIdPkgPath(typ.typeId)
+}
+
+func (typ *Type) InstancesCache(tag string) any {
+	return typ.instancesCache[tag]
+}
+
+func (typ *Type) Dependencies() []string {
 	return typ.dependencies
 }
 
 // MarshalJSON ...
-func (typ Type) MarshalJSON() ([]byte, error) {
+func (typ *Type) MarshalJSON() ([]byte, error) {
+	var cacheInfos = make(map[string]*CacheInfo)
+	for tag, value := range typ.instancesCache {
+		info := &CacheInfo{}
+		if ci, ok := value.(interface {
+			GetType() string
+		}); ok {
+			info.CacheType = ci.GetType()
+		}
+		if cc, ok := value.(interface {
+			GetCodec() codec.CodecInterface
+		}); ok {
+			codec := cc.GetCodec()
+			store := codec.GetStore()
+			info.StoreType = store.GetType()
+		}
+		cacheInfos[tag] = info
+	}
 	return json.Marshal(struct {
-		TypeId       string   `json:"type_id"`
-		Dependencies []string `json:"dependencies,omitempty"`
+		TypeId         string                `json:"type_id"`
+		InstancesCache map[string]*CacheInfo `json:"instances_cache,omitempty"`
+		Dependencies   []string              `json:"dependencies,omitempty"`
 	}{
-		typ.typeId,
-		typ.dependencies,
+		TypeId:         typ.String(),
+		InstancesCache: cacheInfos,
+		Dependencies:   typ.dependencies,
 	})
 }
 
-// UnmarshalJSON ...
-func (typ *Type) UnmarshalJSON(b []byte) error {
-	var s struct {
-		TypeId       string   `json:"type_id"`
-		Dependencies []string `json:"dependencies,omitempty"`
-	}
-	if err := json.Unmarshal(b, &s); err != nil {
-		return err
-	}
-	*typ = Type{
-		typeId:       s.TypeId,
-		dependencies: s.Dependencies,
-	}
-	return nil
+type CacheInfo struct {
+	CacheType string `json:"cache_type"`
+	StoreType string `json:"store_type"`
+}
+
+type TypeOptions struct {
+	InstancesCache  map[tag]any
+	Dependencies    []string
+	UseDependencies bool
 }
 
 // Options control option func for TypeMap's type api, RegisterType|SetType|GetType
-type TypeOption func(*Type)
+type TypeOption func(*TypeOptions)
 
 // WithInstancesCache control option to specify the T's instances cache
-func WithInstancesCache[T any](cache cache.CacheInterface[T]) TypeOption {
-	return func(typ *Type) {
-		typ.instancesCache = cache
-	}
-}
-
-// WithTypeId control option to specify the T's TypeId, means do not use the default `GetTypeId(T)`
-func WithTypeId(typeId string) TypeOption {
-	return func(typ *Type) {
-		typ.typeId = typeId
+func WithInstancesCache[T any](tag string, tagCache cache.CacheInterface[T]) TypeOption {
+	return func(options *TypeOptions) {
+		if options.InstancesCache == nil {
+			options.InstancesCache = make(map[string]any)
+		}
+		if tagCache != nil {
+			options.InstancesCache[tag] = tagCache
+		} else {
+			options.InstancesCache[tag] = cache.New[T](NewMap())
+		}
 	}
 }
 
 // WithDependencies control option to specify the T's dependencies, should be a slice of valid TypeId, used for sort
 func WithDependencies(dependencies []string) TypeOption {
-	return func(typ *Type) {
-		typ.dependencies = dependencies
+	return func(options *TypeOptions) {
+		options.UseDependencies = true
+		options.Dependencies = dependencies
 	}
 }
 
 // Get get instance of T from Type's instances cache
 func Get[T any](ctx context.Context, key any, opts ...Option) (T, error) {
 	options := NewOptions(opts...)
-	cache, err := getInstancesCache[T](options.TypeOptions...)
+	cache, err := getInstancesCache[T](options.Tag)
 	if err != nil {
 		return *new(T), err
 	}
@@ -156,7 +218,7 @@ func Get[T any](ctx context.Context, key any, opts ...Option) (T, error) {
 // Register register a T instance into Type's instances cache, if exists return error
 func Register[T any](ctx context.Context, key any, object T, opts ...Option) error {
 	options := NewOptions(opts...)
-	cache, err := getInstancesCache[T](options.TypeOptions...)
+	cache, err := getInstancesCache[T](options.Tag)
 	if err != nil {
 		return err
 	}
@@ -171,7 +233,7 @@ func Register[T any](ctx context.Context, key any, object T, opts ...Option) err
 // Set set a T instance into Type's instances cache, if exists then override it
 func Set[T any](ctx context.Context, key any, object T, opts ...Option) error { // options ...store.Option
 	options := NewOptions(opts...)
-	cache, err := getInstancesCache[T](options.TypeOptions...)
+	cache, err := getInstancesCache[T](options.Tag)
 	if err != nil {
 		return err
 	}
@@ -181,7 +243,7 @@ func Set[T any](ctx context.Context, key any, object T, opts ...Option) error { 
 // Delete delete a T instance specified by key
 func Delete[T any](ctx context.Context, key any, opts ...Option) error {
 	options := NewOptions(opts...)
-	cache, err := getInstancesCache[T](options.TypeOptions...)
+	cache, err := getInstancesCache[T](options.Tag)
 	if err != nil {
 		return err
 	}
@@ -191,7 +253,7 @@ func Delete[T any](ctx context.Context, key any, opts ...Option) error {
 // Clear clear T's instances cache
 func Clear[T any](ctx context.Context, opts ...Option) error {
 	options := NewOptions(opts...)
-	cache, err := getInstancesCache[T](options.TypeOptions...)
+	cache, err := getInstancesCache[T](options.Tag)
 	if err != nil {
 		return err
 	}
@@ -208,8 +270,14 @@ func NewOptions(opts ...Option) *Options {
 
 // Options control options for TypeMap's instances api, Register|Set|Get|Delete|Clear
 type Options struct {
-	TypeOptions  []TypeOption
+	// TypeOptions used to register T when register instance if T is not registered, not implement...
+	TypeOptions []TypeOption
+
+	// StoreOptions used to store instances into cache
 	StoreOptions []store.Option
+
+	// Tag is used to group the instances of T
+	Tag string
 }
 
 func (options *Options) Options() []Option {
@@ -220,11 +288,19 @@ func (options *Options) Options() []Option {
 	for _, so := range options.StoreOptions {
 		opts = append(opts, WithStoreOption(so))
 	}
+	opts = append(opts, WithTag(options.Tag))
 	return opts
 }
 
 // Option control option for instances api, Register|Set|Get|Delete|Clear
 type Option func(*Options)
+
+// WithTag specify the tag to get instance of T according tag
+func WithTag(tag string) Option {
+	return func(options *Options) {
+		options.Tag = tag
+	}
+}
 
 // WithTypeOption specify TypeOption as Option
 func WithTypeOption(typeOption TypeOption) Option {
@@ -240,54 +316,53 @@ func WithStoreOption(storeOption store.Option) Option {
 	}
 }
 
-func getInstancesCache[T any](opts ...TypeOption) (cache.CacheInterface[T], error) {
-	typ := GetType[T](opts...)
+func getInstancesCache[T any](tag string) (cache.CacheInterface[T], error) {
+	typ := GetType[T]()
 	if typ == nil {
-		return nil, fmt.Errorf("type %s not found", GetTypeId[T]())
+		return nil, fmt.Errorf("type %s not found", GetTypeIdString[T]())
 	}
-	cache, ok := typ.instancesCache.(cache.CacheInterface[T])
+	typ.lock.RLock()
+	cache, ok := typ.instancesCache[tag].(cache.CacheInterface[T])
+	typ.lock.RUnlock()
 	if !ok {
-		return nil, fmt.Errorf("invalid type %s instances cache type: %T", typ.typeId, typ.instancesCache)
+		return nil, fmt.Errorf("invalid type %s instances cache type: %T", typ.String(), typ.instancesCache[tag])
 	}
 	return cache, nil
 }
 
-// GetTypeId get TypeId of T
-func GetTypeId[T any]() string {
-	pointer := new(T)
-	typ := reflect.TypeOf(pointer)
-	if typ.Elem().Kind() != reflect.Interface {
-		typ = typ.Elem()
+// GetTypeId return reflect type of T as TypeId
+func GetTypeId[T any]() reflect.Type {
+	return reflect.TypeOf(new(T)).Elem()
+}
+
+// GetTypeIdString return string representation of reflect type of T
+func GetTypeIdString[T any]() string {
+	return typeIdString(reflect.TypeOf(new(T)).Elem())
+}
+
+func typeIdString(rtype reflect.Type) string {
+	pkgPath := typeIdPkgPath(rtype)
+	i := strings.LastIndex(pkgPath, "/")
+	if pkgPath == "" || i < 0 {
+		return rtype.String()
 	}
-	var level int
-	for ; typ.Kind() == reflect.Ptr; typ = typ.Elem() {
-		level++
+	return pkgPath[:i+1] + rtype.String()
+}
+
+func typeIdPkgPath(rtype reflect.Type) string {
+	t := rtype
+	for ; t.Kind() == reflect.Ptr; t = t.Elem() {
 	}
-	pkgPath := typ.PkgPath()
-	typeName := typ.Name()
-	switch typ.Kind() {
-	case reflect.Interface:
-		return pkgPath + "." + typeName
-	case reflect.Map, reflect.Array, reflect.Slice:
-		if pkgPath != "" { // NOTE: e.g. custom map
-			return pkgPath + "." + typeName
-		}
-		return fmt.Sprintf("%T", *pointer)
-	default:
-		if pkgPath == "" {
-			return strings.Repeat("*", level) + typeName
-		}
-		return pkgPath + "." + strings.Repeat("*", level) + typeName
-	}
+	return t.PkgPath()
 }
 
 // TypeMap a map[TypeId]*Type, with type meta info and instances in *Type
 type TypeMap struct {
-	types map[string]*Type
+	types map[reflect.Type]*Type
 	lock  sync.RWMutex
 }
 
 // global TypeMap
 var typeMap = &TypeMap{
-	types: make(map[string]*Type),
+	types: make(map[reflect.Type]*Type),
 }
