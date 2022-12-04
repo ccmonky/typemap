@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/ccmonky/typemap"
-	"github.com/eko/gocache/v3/cache"
+	"github.com/eko/gocache/lib/v4/cache"
 )
 
 func TestType(t *testing.T) {

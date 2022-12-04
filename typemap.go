@@ -9,9 +9,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/eko/gocache/v3/cache"
-	"github.com/eko/gocache/v3/codec"
-	"github.com/eko/gocache/v3/store"
+	"github.com/eko/gocache/lib/v4/cache"
+	"github.com/eko/gocache/lib/v4/codec"
+	"github.com/eko/gocache/lib/v4/store"
 )
 
 // RegisterType register a *Type into global TypeMap, if exists then try to update the exist *Type
@@ -103,12 +103,6 @@ func GetType[T any]() *Type {
 	defer typeMap.lock.RUnlock()
 	return typeMap.types[GetTypeId[T]()]
 }
-
-// func getType(typeId reflect.Type) *Type {
-// 	typeMap.lock.RLock()
-// 	defer typeMap.lock.RUnlock()
-// 	return typeMap.types[typeId]
-// }
 
 type Type struct {
 	typeId         reflect.Type
