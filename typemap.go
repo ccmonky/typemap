@@ -50,6 +50,10 @@ func RegisterType[T any](opts ...TypeOption) error {
 			needSetType = true
 		}
 		typ.lock.Unlock()
+		// typStr := typ.String()
+		// if _, ok := typeMap.index[typStr]; ok {
+		// 	return fmt.Errorf("type id string %s conflict", typStr)
+		// }
 	}
 	if needSetType {
 		setType[T](typ)
@@ -89,6 +93,7 @@ func setType[T any](typ *Type) error {
 	}
 	typ.lock.Unlock()
 	typeMap.types[typ.typeId] = typ
+	//typeMap.index[typ.String()] = typ
 	return nil
 }
 
@@ -174,7 +179,7 @@ type TypeOptions struct {
 	UseDependencies bool
 }
 
-// Options control option func for TypeMap's type api, RegisterType|SetType|GetType
+// Options control option func for TypeMap's type api, RegisterType|SetType
 type TypeOption func(*TypeOptions)
 
 // WithInstancesCache control option to specify the T's instances cache
@@ -330,6 +335,7 @@ func GetTypeId[T any]() reflect.Type {
 }
 
 // GetTypeIdString return string representation of reflect type of T
+// TODO: Uniqueness proof!
 func GetTypeIdString[T any]() string {
 	return typeIdString(reflect.TypeOf(new(T)).Elem())
 }
@@ -350,11 +356,22 @@ func typeIdPkgPath(rtype reflect.Type) string {
 	return t.PkgPath()
 }
 
+// New utility func to create *T instance which implements I
+func New[T, I any]() func() I {
+	return func() I {
+		var v any = new(T)
+		return v.(I)
+	}
+}
+
 // TypeMap a map[TypeId]*Type, with type meta info and instances in *Type
 type TypeMap struct {
 	types map[reflect.Type]*Type
 	lock  sync.RWMutex
+	//index map[typeIdStr]*Type
 }
+
+//type typeIdStr = string
 
 // global TypeMap
 var typeMap = &TypeMap{

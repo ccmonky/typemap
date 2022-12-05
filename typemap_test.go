@@ -262,6 +262,44 @@ func TestTypeId(t *testing.T) {
 	}
 }
 
+type Iface interface {
+	Set(s string)
+	Get() string
+}
+
+type Impl struct {
+	s string
+}
+
+func (impl *Impl) Set(s string) {
+	impl.s = s
+}
+
+func (impl Impl) Get() string {
+	return impl.s
+}
+
+func TestNew(t *testing.T) {
+	err := typemap.RegisterType[func() Iface]()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	err = typemap.Register[func() Iface](ctx, "impl", typemap.New[Impl, Iface]())
+	if err != nil {
+		t.Fatal(err)
+	}
+	fn, err := typemap.Get[func() Iface](ctx, "impl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := fn()
+	i.Set("abc")
+	if i.Get() != "abc" {
+		t.Fatal(2)
+	}
+}
+
 func BenchmarkGetTypeId(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		typemap.GetTypeId[*Gface]()
