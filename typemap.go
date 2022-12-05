@@ -99,6 +99,8 @@ func setType[T any](typ *Type) error {
 
 // Types returns all Types
 func Types() map[reflect.Type]*Type {
+	typeMap.lock.RLock()
+	defer typeMap.lock.RUnlock()
 	return typeMap.types
 }
 
@@ -131,16 +133,21 @@ func (typ *Type) PkgPath() string {
 }
 
 func (typ *Type) InstancesCache(tag string) any {
+	typ.lock.RLock()
+	defer typ.lock.RUnlock()
 	return typ.instancesCache[tag]
 }
 
 func (typ *Type) Dependencies() []string {
+	typ.lock.RLock()
+	defer typ.lock.RUnlock()
 	return typ.dependencies
 }
 
 // MarshalJSON ...
 func (typ *Type) MarshalJSON() ([]byte, error) {
 	var cacheInfos = make(map[string]*CacheInfo)
+	typ.lock.RLock()
 	for tag, value := range typ.instancesCache {
 		info := &CacheInfo{}
 		if ci, ok := value.(interface {
@@ -157,6 +164,7 @@ func (typ *Type) MarshalJSON() ([]byte, error) {
 		}
 		cacheInfos[tag] = info
 	}
+	typ.lock.RUnlock()
 	return json.Marshal(struct {
 		TypeId         string                `json:"type_id"`
 		InstancesCache map[string]*CacheInfo `json:"instances_cache,omitempty"`
