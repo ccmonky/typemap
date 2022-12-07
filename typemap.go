@@ -50,10 +50,6 @@ func RegisterType[T any](opts ...TypeOption) error {
 			needSetType = true
 		}
 		typ.lock.Unlock()
-		// typStr := typ.String()
-		// if _, ok := typeMap.index[typStr]; ok {
-		// 	return fmt.Errorf("type id string %s conflict", typStr)
-		// }
 	}
 	if needSetType {
 		setType[T](typ)
@@ -93,7 +89,6 @@ func setType[T any](typ *Type) error {
 	}
 	typ.lock.Unlock()
 	typeMap.types[typ.typeId] = typ
-	//typeMap.index[typ.String()] = typ
 	return nil
 }
 
@@ -364,11 +359,11 @@ func typeIdPkgPath(rtype reflect.Type) string {
 	return t.PkgPath()
 }
 
-// New utility func to create *T instance which implements I
-func New[T, I any]() func() I {
-	return func() I {
-		var v any = new(T)
-		return v.(I)
+// New return a constructor func which create *Impl instance that implements interface Iface
+func NewImpl[Impl, Iface any]() func() Iface {
+	return func() Iface {
+		var v any = new(Impl)
+		return v.(Iface)
 	}
 }
 
@@ -376,10 +371,7 @@ func New[T, I any]() func() I {
 type TypeMap struct {
 	types map[reflect.Type]*Type
 	lock  sync.RWMutex
-	//index map[typeIdStr]*Type
 }
-
-//type typeIdStr = string
 
 // global TypeMap
 var typeMap = &TypeMap{

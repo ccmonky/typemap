@@ -285,7 +285,7 @@ func TestNew(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	err = typemap.Register[func() Iface](ctx, "impl", typemap.New[Impl, Iface]())
+	err = typemap.Register[func() Iface](ctx, "impl", typemap.NewImpl[Impl, Iface]())
 	if err != nil {
 		t.Fatal(err)
 	}
