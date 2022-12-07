@@ -279,7 +279,7 @@ func (impl Impl) Get() string {
 	return impl.s
 }
 
-func TestNew(t *testing.T) {
+func TestNewImpl(t *testing.T) {
 	err := typemap.RegisterType[func() Iface]()
 	if err != nil {
 		t.Fatal(err)

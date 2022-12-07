@@ -359,14 +359,6 @@ func typeIdPkgPath(rtype reflect.Type) string {
 	return t.PkgPath()
 }
 
-// New return a constructor func which create *Impl instance that implements interface Iface
-func NewImpl[Impl, Iface any]() func() Iface {
-	return func() Iface {
-		var v any = new(Impl)
-		return v.(Iface)
-	}
-}
-
 // TypeMap a map[TypeId]*Type, with type meta info and instances in *Type
 type TypeMap struct {
 	types map[reflect.Type]*Type
@@ -376,4 +368,19 @@ type TypeMap struct {
 // global TypeMap
 var typeMap = &TypeMap{
 	types: make(map[reflect.Type]*Type),
+}
+
+// New return a constructor func which return a *T instance
+func New[T any]() func() *T {
+	return func() *T {
+		return new(T)
+	}
+}
+
+// New return a constructor func which return a *Impl instance that implements interface Iface
+func NewImpl[Impl, Iface any]() func() Iface {
+	return func() Iface {
+		var v any = new(Impl)
+		return v.(Iface)
+	}
 }
