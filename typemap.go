@@ -370,15 +370,8 @@ var typeMap = &TypeMap{
 	types: make(map[reflect.Type]*Type),
 }
 
-// New return a constructor func which return a *T instance
-func New[T any]() func() *T {
-	return func() *T {
-		return new(T)
-	}
-}
-
 // New return a constructor func which return a *Impl instance that implements interface Iface
-func NewImpl[Impl, Iface any]() func() Iface {
+func New[Impl, Iface any]() func() Iface {
 	return func() Iface {
 		var v any = new(Impl)
 		return v.(Iface)
