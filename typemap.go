@@ -14,6 +14,14 @@ import (
 	"github.com/eko/gocache/lib/v4/store"
 )
 
+// MustRegisterType Register T if error then panic
+func MustRegisterType[T any](opts ...TypeOption) {
+	err := RegisterType[T](opts...)
+	if err != nil {
+		panic(err)
+	}
+}
+
 // RegisterType register a *Type into global TypeMap, if exists then try to update the exist *Type
 // - can specify instances cache container with `WithInstancesCache`, which use `github.com/eko/gocache` interface
 //   default to `cache.New[T](NewMap())`, if tag cache exists then return already eixsts error
@@ -49,12 +57,24 @@ func RegisterType[T any](opts ...TypeOption) error {
 			typ.instancesCache[tag] = tagCache
 			needSetType = true
 		}
+		if options.Description != typ.description {
+			typ.description = options.Description
+			needSetType = true
+		}
 		typ.lock.Unlock()
 	}
 	if needSetType {
 		setType[T](typ)
 	}
 	return nil
+}
+
+// MustSetType Set T if error then panic
+func MustSetType[T any](opts ...TypeOption) {
+	err := SetType[T](opts...)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // SetType register a *Type into global TypeMap, if exists then override it
@@ -72,6 +92,7 @@ func SetType[T any](opts ...TypeOption) error {
 		typeId:         GetTypeId[T](),
 		instancesCache: options.InstancesCache,
 		dependencies:   options.Dependencies,
+		description:    options.Description,
 	}
 	return setType[T](typ)
 }
@@ -108,6 +129,7 @@ func GetType[T any]() *Type {
 
 type Type struct {
 	typeId         reflect.Type
+	description    string
 	dependencies   []string
 	instancesCache map[tag]any // cache.CacheInterface: cannot use generic type cache.CacheInterface[T any] without instantiation
 	lock           sync.RWMutex
@@ -117,6 +139,10 @@ type tag = string
 
 func (typ *Type) TypeId() reflect.Type {
 	return typ.typeId
+}
+
+func (typ *Type) Description() string {
+	return typ.description
 }
 
 func (typ *Type) String() string {
@@ -177,6 +203,7 @@ type CacheInfo struct {
 }
 
 type TypeOptions struct {
+	Description     string
 	InstancesCache  map[tag]any
 	Dependencies    []string
 	UseDependencies bool
@@ -207,6 +234,13 @@ func WithDependencies(dependencies []string) TypeOption {
 	}
 }
 
+// WithDescription control option to specify the T's description
+func WithDescription(description string) TypeOption {
+	return func(options *TypeOptions) {
+		options.Description = description
+	}
+}
+
 // Get get instance of T from Type's instances cache
 func Get[T any](ctx context.Context, key any, opts ...Option) (T, error) {
 	options := NewOptions(opts...)
@@ -215,6 +249,14 @@ func Get[T any](ctx context.Context, key any, opts ...Option) (T, error) {
 		return *new(T), err
 	}
 	return cache.Get(ctx, key)
+}
+
+// MustRegister register a T instance into Type's instances cache, if error then panic
+func MustRegister[T any](ctx context.Context, key any, object T, opts ...Option) {
+	err := Register[T](ctx, key, object, opts...)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Register register a T instance into Type's instances cache, if exists return error
@@ -232,6 +274,14 @@ func Register[T any](ctx context.Context, key any, object T, opts ...Option) err
 	return cache.Set(ctx, key, object, options.StoreOptions...)
 }
 
+// MustSet set a T instance into Type's instances cache, if error then panic
+func MustSet[T any](ctx context.Context, key any, object T, opts ...Option) {
+	err := Set[T](ctx, key, object, opts...)
+	if err != nil {
+		panic(err)
+	}
+}
+
 // Set set a T instance into Type's instances cache, if exists then override it
 func Set[T any](ctx context.Context, key any, object T, opts ...Option) error { // options ...store.Option
 	options := NewOptions(opts...)
@@ -242,6 +292,14 @@ func Set[T any](ctx context.Context, key any, object T, opts ...Option) error { 
 	return cache.Set(ctx, key, object, options.StoreOptions...)
 }
 
+// MustDelete  delete a T instance specified by key, if error then panic
+func MustDelete[T any](ctx context.Context, key any, opts ...Option) {
+	err := Delete[T](ctx, key, opts...)
+	if err != nil {
+		panic(err)
+	}
+}
+
 // Delete delete a T instance specified by key
 func Delete[T any](ctx context.Context, key any, opts ...Option) error {
 	options := NewOptions(opts...)
@@ -250,6 +308,14 @@ func Delete[T any](ctx context.Context, key any, opts ...Option) error {
 		return err
 	}
 	return cache.Delete(ctx, key)
+}
+
+// MustClear clear T's instances cache, if error then panic
+func MustClear[T any](ctx context.Context, opts ...Option) {
+	err := Clear[T](ctx, opts...)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Clear clear T's instances cache
