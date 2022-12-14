@@ -251,6 +251,24 @@ func Get[T any](ctx context.Context, key any, opts ...Option) (T, error) {
 	return cache.Get(ctx, key)
 }
 
+// GetMany get multiple instances of T from Type's instances cache
+func GetMany[T any](ctx context.Context, keys []any, opts ...Option) ([]T, error) {
+	options := NewOptions(opts...)
+	cache, err := getInstancesCache[T](options.Tag)
+	if err != nil {
+		return nil, err
+	}
+	var values []T
+	for _, key := range keys {
+		value, err := cache.Get(ctx, key)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, value)
+	}
+	return values, nil
+}
+
 // MustRegister register a T instance into Type's instances cache, if error then panic
 func MustRegister[T any](ctx context.Context, key any, object T, opts ...Option) {
 	err := Register[T](ctx, key, object, opts...)

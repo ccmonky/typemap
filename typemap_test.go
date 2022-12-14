@@ -300,6 +300,32 @@ func TestNewImpl(t *testing.T) {
 	}
 }
 
+func TestGetMany(t *testing.T) {
+	err := typemap.RegisterType[int8]()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	err = typemap.Register[int8](ctx, "1", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = typemap.Register[int8](ctx, "2", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ints, err := typemap.GetMany[int8](ctx, []any{"1", "2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ints[0] != 1 {
+		t.Fatal("should ==")
+	}
+	if ints[1] != 2 {
+		t.Fatal("should ==")
+	}
+}
+
 func BenchmarkGetTypeId(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		typemap.GetTypeId[*Gface]()
