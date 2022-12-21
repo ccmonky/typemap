@@ -49,3 +49,31 @@ func TestRef(t *testing.T) {
 		t.Fatalf("should == xxx, but got %s", fn())
 	}
 }
+
+type Demo struct {
+	Func typemap.Ref[func() string] `json:"func,omitempty"`
+}
+
+func TestRefNoUnmarshal(t *testing.T) {
+	err := typemap.RegisterType[func() string]()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	err = typemap.Register[func() string](ctx, "", func() string { return "empty" })
+	if err != nil {
+		t.Fatal(err)
+	}
+	demo := &Demo{}
+	err = json.Unmarshal([]byte(`{}`), demo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if demo.Func.Cache != false {
+		t.Fatal("should ==")
+	}
+	fn := demo.Func.MustValue(context.Background())
+	if fn() != "empty" {
+		t.Fatalf("should == empty, but got %s", fn())
+	}
+}
