@@ -14,7 +14,7 @@ import (
 //     AFunc Ref[func()string] `json:"afunc"`
 // }
 // // 1. unmarshal
-// demo := &Demo
+// demo := &Demo{}
 // err := json.Unmarshal([]byte(`{"afunc": "xxx"}`), demo)
 // // or
 // err := json.Unmarshal([]byte(`{"afunc": {"name": "xxx", "cache": true}}`), demo)
@@ -29,7 +29,7 @@ type Ref[T any] struct {
 	lock   sync.RWMutex
 }
 
-// UnmarshalJSON 自定义UnmarshalJSON方法，便于使用
+// UnmarshalJSON custom unmarshal to support simple form(just a string which is a instance name of T)
 func (r *Ref[T]) UnmarshalJSON(b []byte) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -71,6 +71,7 @@ type refSerdeHelper struct {
 	Cache bool   `json:"cache,omitempty"`
 }
 
+// MustValue returns the referenced value, panic if error
 func (r *Ref[T]) MustValue(ctx context.Context, opts ...Option) T {
 	v, err := r.Value(ctx, opts...)
 	if err != nil {
@@ -79,6 +80,7 @@ func (r *Ref[T]) MustValue(ctx context.Context, opts ...Option) T {
 	return v
 }
 
+// Value returns the referenced value
 func (r *Ref[T]) Value(ctx context.Context, opts ...Option) (T, error) {
 	if r.Cache {
 		r.lock.RLock()
