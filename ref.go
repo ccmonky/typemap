@@ -34,13 +34,13 @@ func (r *Ref[T]) UnmarshalJSON(b []byte) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if len(b) >= 2 && b[0] == '"' && b[len(b)-1] == '"' { // NOTE: simple form
-		key := string(b[1 : len(b)-1])
-		v, err := Get[T](ctx, key)
+		r.Name = string(b[1 : len(b)-1])
+		r.Cache = true // NOTE: simple form always cache
+		v, err := Get[T](ctx, r.Name)
 		if err != nil {
 			return fmt.Errorf("get Ref[%T] %s failed: %v", *new(T), string(b), err)
 		}
-		r.Name = key
-		r.lock.Lock() // NOTE: simple form always cache
+		r.lock.Lock()
 		r.cached = true
 		r.value = v
 		r.lock.Unlock()
