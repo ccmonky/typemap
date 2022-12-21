@@ -85,8 +85,9 @@ func (r *Ref[T]) Value(ctx context.Context, opts ...Option) (T, error) {
 	if r.Cache {
 		r.lock.RLock()
 		if r.cached {
+			v := r.value
 			r.lock.RUnlock()
-			return r.value, nil
+			return v, nil
 		}
 		r.lock.RUnlock()
 	}
