@@ -33,7 +33,7 @@ type Ref[T any] struct {
 func (r *Ref[T]) UnmarshalJSON(b []byte) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	if len(b) >= 2 && b[0] == '"' && b[len(b)-1] == '"' { // NOTE: simple form
+	if b[0] == '"' && b[len(b)-1] == '"' { // NOTE: simple form
 		r.Name = string(b[1 : len(b)-1])
 		r.Cache = true // NOTE: simple form always cache
 		v, err := Get[T](ctx, r.Name)

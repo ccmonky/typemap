@@ -20,7 +20,7 @@ func TestRef(t *testing.T) {
 	}
 	ref := new(typemap.Ref[func() string])
 	// simple form
-	err = json.Unmarshal([]byte(`"ref"`), ref)
+	err = json.Unmarshal([]byte(` "ref"`), ref)
 	if err != nil {
 		t.Fatal(err)
 	}
