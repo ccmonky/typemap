@@ -50,3 +50,10 @@ type regSerdeHelper[T any] struct {
 	Value  T       `json:"value"`
 	Action string  `json:"action,omitempty"`
 }
+
+func (r *Reg[T]) RuntimeValue(ctx context.Context, opts ...Option) (T, error) {
+	if r.Name != nil {
+		return Get[T](ctx, r.Name, opts...)
+	}
+	return r.Value, fmt.Errorf("get reg[%T] instance failed: name not set", *new(T))
+}
