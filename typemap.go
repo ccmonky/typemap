@@ -33,9 +33,9 @@ func RegisterType[T any](opts ...TypeOption) error {
 		opt(options)
 	}
 	var needSetType bool
-	typeMap.lock.Lock()
-	defer typeMap.lock.Unlock()
+	typeMap.lock.RLock()
 	typ := typeMap.types[typeId]
+	typeMap.lock.RUnlock()
 	if typ == nil {
 		needSetType = true
 		typ = &Type{
@@ -57,14 +57,16 @@ func RegisterType[T any](opts ...TypeOption) error {
 			typ.instancesCache[tag] = tagCache
 			needSetType = true
 		}
-		if options.Description != typ.description {
+		if options.UseDescription {
 			typ.description = options.Description
 			needSetType = true
 		}
 		typ.lock.Unlock()
 	}
 	if needSetType {
-		setType[T](typ)
+		typeMap.lock.Lock()
+		defer typeMap.lock.Unlock()
+		return setType[T](typ)
 	}
 	return nil
 }
@@ -141,10 +143,6 @@ func (typ *Type) TypeId() reflect.Type {
 	return typ.typeId
 }
 
-func (typ *Type) Description() string {
-	return typ.description
-}
-
 func (typ *Type) String() string {
 	return typeIdString(typ.typeId)
 }
@@ -163,6 +161,12 @@ func (typ *Type) Dependencies() []string {
 	typ.lock.RLock()
 	defer typ.lock.RUnlock()
 	return typ.dependencies
+}
+
+func (typ *Type) Description() string {
+	typ.lock.RLock()
+	defer typ.lock.RUnlock()
+	return typ.description
 }
 
 // MarshalJSON ...
@@ -203,10 +207,11 @@ type CacheInfo struct {
 }
 
 type TypeOptions struct {
-	Description     string
 	InstancesCache  map[tag]any
 	Dependencies    []string
 	UseDependencies bool
+	Description     string
+	UseDescription  bool
 }
 
 // Options control option func for TypeMap's type api, RegisterType|SetType
@@ -237,6 +242,7 @@ func WithDependencies(dependencies []string) TypeOption {
 // WithDescription control option to specify the T's description
 func WithDescription(description string) TypeOption {
 	return func(options *TypeOptions) {
+		options.UseDescription = true
 		options.Description = description
 	}
 }

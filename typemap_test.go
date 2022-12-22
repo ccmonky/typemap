@@ -10,6 +10,17 @@ import (
 	"github.com/eko/gocache/lib/v4/cache"
 )
 
+func TestRegisterTypeMultipleTimes(t *testing.T) {
+	err := typemap.RegisterType[string]()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = typemap.RegisterType[string]()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestType(t *testing.T) {
 	err := typemap.RegisterType[string]()
 	if err != nil {

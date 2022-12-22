@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
-	"time"
 )
 
 // Ref is a reference field that will refer to a T instance stored in typemap
@@ -31,7 +30,7 @@ type Ref[T any] struct {
 
 // UnmarshalJSON custom unmarshal to support simple form(just a string which is a instance name of T)
 func (r *Ref[T]) UnmarshalJSON(b []byte) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultUnmarshalTimeout)
 	defer cancel()
 	if b[0] == '"' && b[len(b)-1] == '"' { // NOTE: simple form
 		r.Name = string(b[1 : len(b)-1])

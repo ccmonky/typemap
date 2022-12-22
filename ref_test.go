@@ -14,7 +14,7 @@ func TestRef(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	err = typemap.Register[func() string](ctx, "ref", func() string { return "xxx" })
+	err = typemap.Register(ctx, "ref", func() string { return "xxx" })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestRefNoUnmarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	err = typemap.Register[func() string](ctx, "", func() string { return "empty" })
+	err = typemap.Register(ctx, "", func() string { return "empty" })
 	if err != nil {
 		t.Fatal(err)
 	}
