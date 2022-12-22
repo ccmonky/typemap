@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-// Ref is a reference field that will refer to a T instance stored in typemap
+// Ref used as a reference field that will refer to a T instance stored in typemap
 // usage:
 // type Demo struct {
 //     AFunc Ref[func()string] `json:"afunc"`
