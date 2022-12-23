@@ -8,12 +8,35 @@ import (
 	"github.com/ccmonky/typemap"
 )
 
-type App struct {
+func TestReg(t *testing.T) {
+	data := []byte(`{
+		"name": "degrade",
+		"value": true
+	}`)
+	s := &typemap.Reg[bool]{}
+	err := json.Unmarshal(data, s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Value != true {
+		t.Fatal("should==")
+	}
+	ctx := context.Background()
+	d, err := typemap.Get[bool](ctx, "degrade")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d != true {
+		t.Fatal("should==")
+	}
+}
+
+type SwitchGroup struct {
 	Switch    *typemap.Reg[bool]                `json:"switch,omitempty"`
 	Blacklist *typemap.Reg[map[string]struct{}] `json:"blacklist,omitempty"`
 }
 
-func TestReg(t *testing.T) {
+func TestSwitchGroup(t *testing.T) {
 	data := []byte(`{
 		"switch": {
 			"name": "switch",
@@ -28,16 +51,16 @@ func TestReg(t *testing.T) {
 			}
 		}
 	}`)
-	app := &App{}
-	err := json.Unmarshal(data, app)
+	sg := &SwitchGroup{}
+	err := json.Unmarshal(data, sg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if app.Switch.Value != true {
+	if sg.Switch.Value != true {
 		t.Fatal("should==")
 	}
 	for _, item := range []string{"xxx", "yyy", "zzz"} {
-		if _, ok := app.Blacklist.Value[item]; !ok {
+		if _, ok := sg.Blacklist.Value[item]; !ok {
 			t.Fatal("should contain")
 		}
 	}
@@ -60,22 +83,22 @@ func TestReg(t *testing.T) {
 	}
 }
 
-func TestRegNull(t *testing.T) {
+func TestSwitchGroupNull(t *testing.T) {
 	data := []byte(`{
 		"switch": {
 			"name": "switch",
 			"value": true
 		}
 	}`)
-	app := &App{}
-	err := json.Unmarshal(data, app)
+	sg := &SwitchGroup{}
+	err := json.Unmarshal(data, sg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if app.Switch.Value != true {
+	if sg.Switch.Value != true {
 		t.Fatal("should==")
 	}
-	if app.Blacklist != nil {
+	if sg.Blacklist != nil {
 		t.Fatal("should == nil")
 	}
 	ctx := context.Background()

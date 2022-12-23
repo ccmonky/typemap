@@ -9,8 +9,8 @@ import (
 
 // Reg used as a field that will set its name & value into instances map of T in typemap
 type Reg[T any] struct {
-	Name  *string `json:"name,omitempty"`
-	Value T       `json:"value"`
+	Name  string `json:"name"`
+	Value T      `json:"value"`
 	// Action is the action used to set intance of T, available values are: ["register", "set"], default is "set"
 	Action string `json:"action,omitempty"`
 }
@@ -31,29 +31,36 @@ func (r *Reg[T]) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return fmt.Errorf("register type of Reg[%T] failed: %v", *new(T), err)
 	}
-	if r.Name != nil {
-		switch strings.ToLower(r.Action) {
-		case "register":
-			err = Register(ctx, *r.Name, r.Value)
-		default:
-			err = Set(ctx, *r.Name, r.Value)
-		}
-		if err != nil {
-			return fmt.Errorf("set Reg[%T] %s failed: %v", *new(T), string(b), err)
-		}
+	switch strings.ToLower(r.Action) {
+	case "register":
+		err = Register(ctx, r.Name, r.Value)
+	default:
+		err = Set(ctx, r.Name, r.Value)
+	}
+	if err != nil {
+		return fmt.Errorf("set Reg[%T] %s failed: %v", *new(T), string(b), err)
 	}
 	return nil
 }
 
-type regSerdeHelper[T any] struct {
-	Name   *string `json:"name,omitempty"`
-	Value  T       `json:"value"`
-	Action string  `json:"action,omitempty"`
+func (r Reg[T]) MarshalSchema() ([]byte, error) {
+	return []byte(fmt.Sprintf(`{
+		"type": "object",
+		"properties": {
+			"name": {
+				"type": "string",
+				"enum": ["%s"]
+			}
+		}
+	}`, r.Name)), nil
 }
 
-func (r *Reg[T]) RuntimeValue(ctx context.Context, opts ...Option) (T, error) {
-	if r.Name != nil {
-		return Get[T](ctx, r.Name, opts...)
-	}
-	return r.Value, fmt.Errorf("get reg[%T] instance failed: name not set", *new(T))
+type regSerdeHelper[T any] struct {
+	Name   string `json:"name"`
+	Value  T      `json:"value"`
+	Action string `json:"action,omitempty"`
+}
+
+func (r Reg[T]) CurrentValue(ctx context.Context, opts ...Option) (T, error) {
+	return Get[T](ctx, r.Name, opts...)
 }
