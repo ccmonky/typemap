@@ -14,14 +14,20 @@ func TestReg(t *testing.T) {
 		"value": true
 	}`)
 	s := &typemap.Reg[bool]{
-		Action: "register",
+		Action: typemap.RegisterAction,
 	}
 	err := json.Unmarshal(data, s)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if s.Value != true {
-		t.Fatal("should==")
+		t.Fatal("value should== true")
+	}
+	if string(s.Action) != "" {
+		t.Fatal("action should == ''")
+	}
+	s = &typemap.Reg[bool]{
+		Action: typemap.RegisterAction,
 	}
 	err = json.Unmarshal(data, s)
 	if err == nil {
@@ -34,6 +40,21 @@ func TestReg(t *testing.T) {
 	}
 	if d != true {
 		t.Fatal("should==")
+	}
+	data = []byte(`{
+		"name": "degrade",
+		"value": true,
+		"action": "set"
+	}`)
+	s = &typemap.Reg[bool]{
+		Action: typemap.RegisterAction,
+	}
+	err = json.Unmarshal(data, s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Action != typemap.SetAction {
+		t.Fatal("action should == 'set'")
 	}
 }
 
