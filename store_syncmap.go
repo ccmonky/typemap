@@ -2,7 +2,7 @@ package typemap
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -31,7 +31,7 @@ func (s *SyncMapStore) Get(_ context.Context, key any) (any, error) {
 	var err error
 	value, exists := s.items.Load(key)
 	if !exists {
-		err = store.NotFoundWithCause(errors.New("value not found in SyncMap store"))
+		err = store.NotFoundWithCause(fmt.Errorf("%v not found in SyncMap store", key))
 	}
 	return value, err
 }

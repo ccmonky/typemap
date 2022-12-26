@@ -293,9 +293,11 @@ func Register[T any](ctx context.Context, key any, object T, opts ...Option) err
 	if _, err := cache.Get(ctx, key); err != nil {
 		if !errors.Is(err, store.NotFound{}) { // NOTE: provide a Option to custom IsNotFound func?
 			return err
+		} else {
+			return cache.Set(ctx, key, object, options.StoreOptions...)
 		}
 	}
-	return cache.Set(ctx, key, object, options.StoreOptions...)
+	return fmt.Errorf("register %s:%v failed: already exists", GetTypeIdString[T](), key)
 }
 
 // MustSet set a T instance into Type's instances cache, if error then panic

@@ -13,13 +13,19 @@ func TestReg(t *testing.T) {
 		"name": "degrade",
 		"value": true
 	}`)
-	s := &typemap.Reg[bool]{}
+	s := &typemap.Reg[bool]{
+		Action: "register",
+	}
 	err := json.Unmarshal(data, s)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if s.Value != true {
 		t.Fatal("should==")
+	}
+	err = json.Unmarshal(data, s)
+	if err == nil {
+		t.Fatal("should get register failed")
 	}
 	ctx := context.Background()
 	d, err := typemap.Get[bool](ctx, "degrade")

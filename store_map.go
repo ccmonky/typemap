@@ -2,7 +2,7 @@ package typemap
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -37,7 +37,7 @@ func (s *MapStore) Get(_ context.Context, key any) (any, error) {
 	defer s.mu.RUnlock()
 	value, exists := s.items[keyStr]
 	if !exists {
-		err = store.NotFoundWithCause(errors.New("value not found in Map store"))
+		err = store.NotFoundWithCause(fmt.Errorf("%v not found in Map store", key))
 	}
 	return value, err
 }
