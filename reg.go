@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 )
 
@@ -30,7 +29,6 @@ func (r *Reg[T]) UnmarshalJSON(b []byte) error {
 	if helper.Action != "" { // NOTE: if not input then use the r's action!
 		r.Action = helper.Action
 	}
-	log.Println(11, r.Action)
 	err = RegisterType[T]() // NOTE: maybe be a duplicate operation, but no effect if T already registered!
 	if err != nil {
 		return fmt.Errorf("register type of Reg[%T] failed: %v", *new(T), err)
