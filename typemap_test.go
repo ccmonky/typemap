@@ -21,6 +21,15 @@ func TestRegisterTypeMultipleTimes(t *testing.T) {
 	}
 }
 
+type NotFound string
+
+func TestNotFoundType(t *testing.T) {
+	_, err := typemap.Get[NotFound](context.Background(), "xxx")
+	if !typemap.IsNotFound(err) {
+		t.Fatal(err)
+	}
+}
+
 func TestType(t *testing.T) {
 	err := typemap.RegisterType[string]()
 	if err != nil {

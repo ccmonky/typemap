@@ -413,7 +413,7 @@ func WithStoreOption(storeOption store.Option) Option {
 func getInstancesCache[T any](tag string) (cache.CacheInterface[T], error) {
 	typ := GetType[T]()
 	if typ == nil {
-		return nil, fmt.Errorf("type %s not found", GetTypeIdString[T]())
+		return nil, NewNotFoundError(fmt.Sprintf("type %s not found", GetTypeIdString[T]()))
 	}
 	typ.lock.RLock()
 	cache, ok := typ.instancesCache[tag].(cache.CacheInterface[T])
