@@ -103,11 +103,13 @@ func setType[T any](typ *Type) error {
 	typ.lock.Lock()
 	if typ.instancesCache == nil {
 		typ.instancesCache = make(map[string]any)
-		typ.instancesCache[""] = cache.New[T](NewMap()) // NOTE: default tag is ""
+		//typ.instancesCache[""] = cache.New[T](NewMap()) // NOTE: default tag is ""
+		typ.instancesCache[""] = NewDefaultCache[T]() // NOTE: default tag is ""
 	}
 	for tag, tagCache := range typ.instancesCache {
 		if tagCache == nil {
-			typ.instancesCache[tag] = cache.New[T](NewMap())
+			//typ.instancesCache[tag] = cache.New[T](NewMap())
+			typ.instancesCache[tag] = NewDefaultCache[T]()
 		}
 	}
 	typ.lock.Unlock()
@@ -226,7 +228,8 @@ func WithInstancesCache[T any](tag string, tagCache cache.CacheInterface[T]) Typ
 		if tagCache != nil {
 			options.InstancesCache[tag] = tagCache
 		} else {
-			options.InstancesCache[tag] = cache.New[T](NewMap())
+			//options.InstancesCache[tag] = cache.New[T](NewMap())
+			options.InstancesCache[tag] = NewDefaultCache[T]()
 		}
 	}
 }
@@ -460,12 +463,4 @@ type TypeMap struct {
 // global TypeMap
 var typeMap = &TypeMap{
 	types: make(map[reflect.Type]*Type),
-}
-
-// New return a constructor func which return a *Impl instance that implements interface Iface
-func New[Impl, Iface any]() func() Iface {
-	return func() Iface {
-		var v any = new(Impl)
-		return v.(Iface)
-	}
 }

@@ -299,27 +299,6 @@ func (impl Impl) Get() string {
 	return impl.s
 }
 
-func TestNewImpl(t *testing.T) {
-	err := typemap.RegisterType[func() Iface]()
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx := context.Background()
-	err = typemap.Register[func() Iface](ctx, "impl", typemap.New[Impl, Iface]())
-	if err != nil {
-		t.Fatal(err)
-	}
-	fn, err := typemap.Get[func() Iface](ctx, "impl")
-	if err != nil {
-		t.Fatal(err)
-	}
-	i := fn()
-	i.Set("abc")
-	if i.Get() != "abc" {
-		t.Fatalf("should == abc, got %s", i.Get())
-	}
-}
-
 func TestGetMany(t *testing.T) {
 	err := typemap.RegisterType[int8]()
 	if err != nil {
