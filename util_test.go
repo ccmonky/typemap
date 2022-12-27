@@ -19,16 +19,22 @@ func (dt DefaultType) Default() *DefaultType {
 
 func TestNewDefaultCache(t *testing.T) {
 	var dt any = DefaultType{}
+	if _, ok := dt.(typemap.Default[DefaultType]); ok {
+		t.Fatal("DefaultType should not implemnt typemap.Default[DefaultType]")
+	}
 	if d, ok := dt.(typemap.Default[*DefaultType]); !ok {
-		t.Fatal("DefaultType should implemnt Default")
+		t.Fatal("DefaultType should implemnt typemap.Default[*DefaultType]")
 	} else {
 		if d.Default().Value != "default" {
 			t.Fatal("should==")
 		}
 	}
 	dt = &DefaultType{}
+	if _, ok := dt.(typemap.Default[DefaultType]); ok {
+		t.Fatal("*DefaultType should not implemnt typemap.Default[DefaultType]")
+	}
 	if d, ok := dt.(typemap.Default[*DefaultType]); !ok {
-		t.Fatal("*DefaultType should implemnt Default")
+		t.Fatal("*DefaultType should implemnt typemap.Default[*DefaultType]")
 	} else {
 		if d.Default().Value != "default" {
 			t.Fatal("should==")
