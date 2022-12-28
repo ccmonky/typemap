@@ -54,18 +54,18 @@ func TestNewDefaultCacheImplDefault(t *testing.T) {
 	}
 }
 
-type LoadableType struct {
+type LoadDefaultType struct {
 	Value string
 }
 
-func (lt LoadableType) Load(ctx context.Context, key any) (*LoadableType, error) {
+func (lt LoadDefaultType) LoadDefault(ctx context.Context, key any) (*LoadDefaultType, error) {
 	switch key := key.(type) {
 	case string:
 		switch key {
 		case "":
-			return &LoadableType{}, nil
+			return &LoadDefaultType{}, nil
 		case "load":
-			return &LoadableType{Value: "load"}, nil
+			return &LoadDefaultType{Value: "load"}, nil
 		}
 	}
 	return nil, fmt.Errorf("load %v failed: not found", key)
@@ -73,21 +73,21 @@ func (lt LoadableType) Load(ctx context.Context, key any) (*LoadableType, error)
 
 func TestNewDefaultCacheImplLoadable(t *testing.T) {
 	ctx := context.Background()
-	var lt any = LoadableType{}
-	if _, ok := lt.(typemap.Loadable[LoadableType]); ok {
-		t.Fatal("LoadableType should not implemnt typemap.Loadable[LoadableType]")
+	var lt any = LoadDefaultType{}
+	if _, ok := lt.(typemap.DefaultLoader[LoadDefaultType]); ok {
+		t.Fatal("LoadDefaultType should not implemnt typemap.DefaultLoader[LoadDefaultType]")
 	}
-	if l, ok := lt.(typemap.Loadable[*LoadableType]); !ok {
-		t.Fatal("LoadableType should implemnt typemap.Loadable[*LoadableType]")
+	if l, ok := lt.(typemap.DefaultLoader[*LoadDefaultType]); !ok {
+		t.Fatal("LoadDefaultType should implemnt typemap.DefaultLoader[*LoadDefaultType]")
 	} else {
-		v, err := l.Load(ctx, "")
+		v, err := l.LoadDefault(ctx, "")
 		if err != nil {
 			t.Fatal(err)
 		}
 		if v.Value != "" {
 			t.Fatal("should==")
 		}
-		v, err = l.Load(ctx, "load")
+		v, err = l.LoadDefault(ctx, "load")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -95,21 +95,21 @@ func TestNewDefaultCacheImplLoadable(t *testing.T) {
 			t.Fatal("should==")
 		}
 	}
-	lt = &LoadableType{}
-	if _, ok := lt.(typemap.Loadable[LoadableType]); ok {
-		t.Fatal("*LoadableType should not implemnt typemap.Loadable[LoadableType]")
+	lt = &LoadDefaultType{}
+	if _, ok := lt.(typemap.DefaultLoader[LoadDefaultType]); ok {
+		t.Fatal("*LoadDefaultType should not implemnt typemap.DefaultLoader[LoadDefaultType]")
 	}
-	if l, ok := lt.(typemap.Loadable[*LoadableType]); !ok {
-		t.Fatal("*LoadableType should implemnt typemap.Loadable[*LoadableType]")
+	if l, ok := lt.(typemap.DefaultLoader[*LoadDefaultType]); !ok {
+		t.Fatal("*LoadDefaultType should implemnt typemap.DefaultLoader[*LoadDefaultType]")
 	} else {
-		v, err := l.Load(ctx, "")
+		v, err := l.LoadDefault(ctx, "")
 		if err != nil {
 			t.Fatal(err)
 		}
 		if v.Value != "" {
 			t.Fatal("should==")
 		}
-		v, err = l.Load(ctx, "load")
+		v, err = l.LoadDefault(ctx, "load")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -117,25 +117,25 @@ func TestNewDefaultCacheImplLoadable(t *testing.T) {
 			t.Fatal("should==")
 		}
 	}
-	err := typemap.RegisterType[*LoadableType]()
+	err := typemap.RegisterType[*LoadDefaultType]()
 	if err != nil {
 		t.Fatal(err)
 	}
-	l, err := typemap.Get[*LoadableType](context.Background(), "")
+	l, err := typemap.Get[*LoadDefaultType](context.Background(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if l.Value != "" {
 		t.Fatal("should ==")
 	}
-	l, err = typemap.Get[*LoadableType](context.Background(), "load")
+	l, err = typemap.Get[*LoadDefaultType](context.Background(), "load")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if l.Value != "load" {
 		t.Fatal("should ==")
 	}
-	_, err = typemap.Get[*LoadableType](context.Background(), "not-exist")
+	_, err = typemap.Get[*LoadDefaultType](context.Background(), "not-exist")
 	if err == nil {
 		t.Fatal("should error")
 	}

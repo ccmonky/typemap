@@ -16,6 +16,9 @@ func NewDefaultCache[T any]() cache.CacheInterface[T] {
 	if loader, ok := value.(Loadable[T]); ok {
 		return cache.NewLoadable[T](loader.Load, cache.New[T](NewMap()))
 	}
+	if defLoader, ok := value.(DefaultLoader[T]); ok {
+		return cache.NewLoadable[T](defLoader.LoadDefault, cache.New[T](NewMap()))
+	}
 	if def, ok := value.(Default[T]); ok {
 		loader := func(ctx context.Context, key any) (T, error) {
 			return def.Default(), nil
