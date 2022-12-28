@@ -8,9 +8,14 @@ import (
 )
 
 // NewDefaultCache create a new default cache for type T
-// if T implements `Default`, returns a `cache.NewLoadable` else a `cache.New`
+// - if T implements `Loadable`, returns a `cache.NewLoadable` with Load as LoadFunction
+// - if T implements `Default`, returns a `cache.NewLoadable` with Default as LoadFunction
+// - otherwise, return a `cache.New`
 func NewDefaultCache[T any]() cache.CacheInterface[T] {
 	var value any = New[T]()
+	if loader, ok := value.(Loadable[T]); ok {
+		return cache.NewLoadable[T](loader.Load, cache.New[T](NewMap()))
+	}
 	if def, ok := value.(Default[T]); ok {
 		loader := func(ctx context.Context, key any) (T, error) {
 			return def.Default(), nil

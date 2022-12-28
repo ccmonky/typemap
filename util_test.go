@@ -2,6 +2,7 @@ package typemap_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/ccmonky/typemap"
@@ -17,7 +18,7 @@ func (dt DefaultType) Default() *DefaultType {
 	}
 }
 
-func TestNewDefaultCache(t *testing.T) {
+func TestNewDefaultCacheImplDefault(t *testing.T) {
 	var dt any = DefaultType{}
 	if _, ok := dt.(typemap.Default[DefaultType]); ok {
 		t.Fatal("DefaultType should not implemnt typemap.Default[DefaultType]")
@@ -50,6 +51,93 @@ func TestNewDefaultCache(t *testing.T) {
 	}
 	if d.Value != "default" {
 		t.Fatal("should ==")
+	}
+}
+
+type LoadableType struct {
+	Value string
+}
+
+func (lt LoadableType) Load(ctx context.Context, key any) (*LoadableType, error) {
+	switch key := key.(type) {
+	case string:
+		switch key {
+		case "":
+			return &LoadableType{}, nil
+		case "load":
+			return &LoadableType{Value: "load"}, nil
+		}
+	}
+	return nil, fmt.Errorf("load %v failed: not found", key)
+}
+
+func TestNewDefaultCacheImplLoadable(t *testing.T) {
+	ctx := context.Background()
+	var lt any = LoadableType{}
+	if _, ok := lt.(typemap.Loadable[LoadableType]); ok {
+		t.Fatal("LoadableType should not implemnt typemap.Loadable[LoadableType]")
+	}
+	if l, ok := lt.(typemap.Loadable[*LoadableType]); !ok {
+		t.Fatal("LoadableType should implemnt typemap.Loadable[*LoadableType]")
+	} else {
+		v, err := l.Load(ctx, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v.Value != "" {
+			t.Fatal("should==")
+		}
+		v, err = l.Load(ctx, "load")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v.Value != "load" {
+			t.Fatal("should==")
+		}
+	}
+	lt = &LoadableType{}
+	if _, ok := lt.(typemap.Loadable[LoadableType]); ok {
+		t.Fatal("*LoadableType should not implemnt typemap.Loadable[LoadableType]")
+	}
+	if l, ok := lt.(typemap.Loadable[*LoadableType]); !ok {
+		t.Fatal("*LoadableType should implemnt typemap.Loadable[*LoadableType]")
+	} else {
+		v, err := l.Load(ctx, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v.Value != "" {
+			t.Fatal("should==")
+		}
+		v, err = l.Load(ctx, "load")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v.Value != "load" {
+			t.Fatal("should==")
+		}
+	}
+	err := typemap.RegisterType[*LoadableType]()
+	if err != nil {
+		t.Fatal(err)
+	}
+	l, err := typemap.Get[*LoadableType](context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.Value != "" {
+		t.Fatal("should ==")
+	}
+	l, err = typemap.Get[*LoadableType](context.Background(), "load")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.Value != "load" {
+		t.Fatal("should ==")
+	}
+	_, err = typemap.Get[*LoadableType](context.Background(), "not-exist")
+	if err == nil {
+		t.Fatal("should error")
 	}
 }
 
