@@ -48,6 +48,17 @@ func (s *MapStore) GetWithTTL(ctx context.Context, key any) (any, time.Duration,
 	return value, NoExpiration, err
 }
 
+// Register Set only when key not found
+func (s *MapStore) Register(ctx context.Context, key any, value any, options ...store.Option) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.items[key.(string)]; ok {
+		return fmt.Errorf("mapstore: register key %v failed: alreasy exists", key)
+	}
+	s.items[key.(string)] = value
+	return nil
+}
+
 // Set defines data in GoCache memoey cache for given key identifier
 func (s *MapStore) Set(ctx context.Context, key any, value any, options ...store.Option) error {
 	s.mu.Lock()

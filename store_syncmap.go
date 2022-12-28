@@ -42,6 +42,15 @@ func (s *SyncMapStore) GetWithTTL(ctx context.Context, key any) (any, time.Durat
 	return value, NoExpiration, err
 }
 
+// Register Set only when key not found
+func (s *SyncMapStore) Register(ctx context.Context, key any, value any, options ...store.Option) error {
+	_, loaded := s.items.LoadOrStore(key, value)
+	if loaded {
+		return fmt.Errorf("syncmapstore: register key %v failed: alreasy exists", key)
+	}
+	return nil
+}
+
 // Set defines data in GoCache memoey cache for given key identifier
 func (s *SyncMapStore) Set(ctx context.Context, key any, value any, options ...store.Option) error {
 	s.items.Store(key, value)

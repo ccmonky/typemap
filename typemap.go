@@ -209,8 +209,8 @@ type CacheInfo struct {
 type TypeOptions struct {
 	InstancesCache  map[tag]any
 	Dependencies    []string
-	UseDependencies bool
 	Description     string
+	UseDependencies bool
 	UseDescription  bool
 }
 
@@ -290,8 +290,8 @@ func Register[T any](ctx context.Context, key any, object T, opts ...Option) err
 	if err != nil {
 		return err
 	}
-	if _, err := cache.Get(ctx, key); err != nil {
-		if !errors.Is(err, store.NotFound{}) { // NOTE: provide a Option to custom IsNotFound func?
+	if _, err := cache.Get(ctx, key); err != nil { // FIXME: atomic!
+		if !errors.Is(err, store.NotFound{}) {
 			return err
 		} else {
 			return cache.Set(ctx, key, object, options.StoreOptions...)
@@ -413,7 +413,11 @@ func WithStoreOption(storeOption store.Option) Option {
 func getInstancesCache[T any](tag string) (cache.CacheInterface[T], error) {
 	typ := GetType[T]()
 	if typ == nil {
-		return nil, NewNotFoundError(fmt.Sprintf("type %s not found", GetTypeIdString[T]()))
+		err := RegisterType[T]() // NOTE: register type first time if not found?
+		if err != nil {
+			return nil, err
+		}
+		typ = GetType[T]()
 	}
 	typ.lock.RLock()
 	cache, ok := typ.instancesCache[tag].(cache.CacheInterface[T])

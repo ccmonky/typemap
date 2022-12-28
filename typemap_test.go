@@ -3,11 +3,13 @@ package typemap_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"testing"
 
 	"github.com/ccmonky/typemap"
 	"github.com/eko/gocache/lib/v4/cache"
+	"github.com/eko/gocache/lib/v4/store"
 )
 
 func TestRegisterTypeMultipleTimes(t *testing.T) {
@@ -21,12 +23,12 @@ func TestRegisterTypeMultipleTimes(t *testing.T) {
 	}
 }
 
-type NotFound string
+type NotRegister string
 
 func TestNotFoundType(t *testing.T) {
-	_, err := typemap.Get[NotFound](context.Background(), "xxx")
-	if !typemap.IsNotFound(err) {
-		t.Fatal(err)
+	_, err := typemap.Get[NotRegister](context.Background(), "xxx")
+	if !errors.Is(err, store.NotFound{}) {
+		t.Fatal("should be store.NotFound")
 	}
 }
 
@@ -328,5 +330,16 @@ func TestGetMany(t *testing.T) {
 func BenchmarkGetTypeId(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		typemap.GetTypeId[*Gface]()
+	}
+}
+
+func BenchmarkRegisterTypeMultiple(b *testing.B) {
+	err := typemap.RegisterType[uint32]()
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		_ = typemap.RegisterType[uint32]()
 	}
 }

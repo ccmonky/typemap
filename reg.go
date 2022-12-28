@@ -38,10 +38,6 @@ func (r *Reg[T]) UnmarshalJSON(b []byte) error {
 		action = helper.Action
 	}
 	r.Action = helper.Action
-	err = RegisterType[T]() // NOTE: maybe be a duplicate operation, but no effect if T already registered!
-	if err != nil {
-		return fmt.Errorf("register type of Reg[%T] failed: %v", *new(T), err)
-	}
 	switch action {
 	case RegisterAction:
 		err = Register(ctx, r.Name, r.Value)
