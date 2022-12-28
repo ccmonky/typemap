@@ -41,7 +41,25 @@ func RegisterType[T any](opts ...TypeOption) error {
 		typ = &Type{
 			typeId:         typeId,
 			instancesCache: options.InstancesCache,
-			dependencies:   options.Dependencies,
+		}
+		var instance any
+		if options.UseDependencies {
+			typ.dependencies = options.Dependencies
+		} else {
+			instance = New[T]()
+			if dep, ok := instance.(Dependencies); ok {
+				typ.dependencies = dep.Dependencies()
+			}
+		}
+		if options.UseDescription {
+			typ.description = options.Description
+		} else {
+			if instance == nil {
+				instance = New[T]()
+			}
+			if dep, ok := instance.(Description); ok {
+				typ.description = dep.Description()
+			}
 		}
 	} else {
 		typ.lock.Lock()
@@ -169,7 +187,7 @@ func (typ *Type) Description() string {
 	return typ.description
 }
 
-// MarshalJSON ...
+// MarshalJSON marshal Type into JSON
 func (typ *Type) MarshalJSON() ([]byte, error) {
 	var cacheInfos = make(map[string]*CacheInfo)
 	typ.lock.RLock()
@@ -194,18 +212,22 @@ func (typ *Type) MarshalJSON() ([]byte, error) {
 		TypeId         string                `json:"type_id"`
 		InstancesCache map[string]*CacheInfo `json:"instances_cache,omitempty"`
 		Dependencies   []string              `json:"dependencies,omitempty"`
+		Description    string                `json:"description,omitempty"`
 	}{
 		TypeId:         typ.String(),
 		InstancesCache: cacheInfos,
 		Dependencies:   typ.dependencies,
+		Description:    typ.description,
 	})
 }
 
+// CacheInfo auxiliary json serialization
 type CacheInfo struct {
 	CacheType string `json:"cache_type"`
 	StoreType string `json:"store_type"`
 }
 
+// TypeOptions options used to control Type creation
 type TypeOptions struct {
 	InstancesCache  map[tag]any
 	Dependencies    []string

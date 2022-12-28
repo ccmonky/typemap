@@ -32,17 +32,47 @@ func TestNotRegisterType(t *testing.T) {
 	}
 }
 
+type DepDesType struct{}
+
+func (DepDesType) Dependencies() []string {
+	return []string{"1", "2"}
+}
+
+func (DepDesType) Description() string {
+	return "description"
+}
+
 func TestType(t *testing.T) {
-	err := typemap.RegisterType[string]()
+	err := typemap.RegisterType[*DepDesType]()
 	if err != nil {
 		t.Fatal(err)
 	}
-	typ := typemap.GetType[string]()
+	typ := typemap.GetType[*DepDesType]()
 	data, err := json.Marshal(typ)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log(string(data))
+	var m = map[string]any{}
+	json.Unmarshal(data, &m)
+	if m["type_id"] != "github.com/ccmonky/*typemap_test.DepDesType" {
+		t.Errorf("type_id got %v", m["type_id"])
+	}
+
+	deps := m["dependencies"].([]interface{})
+	if deps[0].(string) != "1" && deps[1].(string) != "2" {
+		t.Errorf("dependencies got %v", m["dependencies"])
+	}
+	if m["description"].(string) != "description" {
+		t.Errorf("description got %v", m["description"])
+	}
+	instancesCache := m["instances_cache"].(map[string]any)
+	tagCache := instancesCache[""].(map[string]any)
+	if tagCache["cache_type"].(string) != "cache" {
+		t.Errorf("cache_type got %v", tagCache["cache_type"])
+	}
+	if tagCache["store_type"].(string) != "map" {
+		t.Errorf("store_type got %v", tagCache["store_type"])
+	}
 }
 
 func TestMapStore(t *testing.T) {
