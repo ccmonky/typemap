@@ -70,6 +70,11 @@ type refSerdeHelper struct {
 	Cache bool   `json:"cache,omitempty"`
 }
 
+// V is alias of `MustValue`
+func (r *Ref[T]) V(ctx context.Context, opts ...Option) T {
+	return r.MustValue(ctx, opts...)
+}
+
 // MustValue returns the referenced value, panic if error
 func (r *Ref[T]) MustValue(ctx context.Context, opts ...Option) T {
 	v, err := r.Value(ctx, opts...)

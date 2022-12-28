@@ -9,6 +9,7 @@ import (
 
 // NewDefaultCache create a new default cache for type T
 // - if T implements `Loadable`, returns a `cache.NewLoadable` with Load as LoadFunction
+// - if T implements `DefaultLoader`, returns a `cache.NewLoadable` with LoadDefault as LoadFunction
 // - if T implements `Default`, returns a `cache.NewLoadable` with Default as LoadFunction
 // - otherwise, return a `cache.New`
 func NewDefaultCache[T any]() cache.CacheInterface[T] {
