@@ -1,6 +1,10 @@
 package typemap
 
-import "context"
+import (
+	"context"
+
+	"github.com/eko/gocache/lib/v4/store"
+)
 
 // Loadable load instance of T according to key
 type Loadable[T any] interface {
@@ -25,4 +29,8 @@ type Description interface {
 // Dependencies describes the type's dependencies
 type Dependencies interface {
 	Dependencies() []string
+}
+
+type Registerable interface {
+	Register(ctx context.Context, key any, value any, options ...store.Option) error
 }

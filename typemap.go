@@ -151,7 +151,7 @@ type Type struct {
 	typeId         reflect.Type
 	description    string
 	dependencies   []string
-	instancesCache map[tag]any // cache.CacheInterface: cannot use generic type cache.CacheInterface[T any] without instantiation
+	instancesCache map[tag]any // map[tag]cache.SetterCacheInterface
 	lock           sync.RWMutex
 }
 
@@ -240,7 +240,7 @@ type TypeOptions struct {
 type TypeOption func(*TypeOptions)
 
 // WithInstancesCache control option to specify the T's instances cache
-func WithInstancesCache[T any](tag string, tagCache cache.CacheInterface[T]) TypeOption {
+func WithInstancesCache[T any](tag string, tagCache cache.SetterCacheInterface[T]) TypeOption {
 	return func(options *TypeOptions) {
 		if options.InstancesCache == nil {
 			options.InstancesCache = make(map[string]any)
@@ -312,11 +312,15 @@ func Register[T any](ctx context.Context, key any, object T, opts ...Option) err
 	if err != nil {
 		return err
 	}
-	if _, err := cache.Get(ctx, key); err != nil { // FIXME: atomic!
-		if !errors.Is(err, store.NotFound{}) {
-			return err
-		} else {
-			return cache.Set(ctx, key, object, options.StoreOptions...)
+	if reg, ok := cache.GetCodec().GetStore().(Registerable); ok {
+		return reg.Register(ctx, key, object, options.StoreOptions...)
+	} else {
+		if _, err := cache.Get(ctx, key); err != nil { // NOTE: not atomic!
+			if !errors.Is(err, store.NotFound{}) {
+				return err
+			} else {
+				return cache.Set(ctx, key, object, options.StoreOptions...)
+			}
 		}
 	}
 	return fmt.Errorf("register %s:%v failed: already exists", GetTypeIdString[T](), key)
@@ -432,7 +436,7 @@ func WithStoreOption(storeOption store.Option) Option {
 	}
 }
 
-func getInstancesCache[T any](tag string) (cache.CacheInterface[T], error) {
+func getInstancesCache[T any](tag string) (cache.SetterCacheInterface[T], error) {
 	typ := GetType[T]()
 	if typ == nil {
 		err := RegisterType[T]() // NOTE: register type first time if not found?
@@ -442,7 +446,7 @@ func getInstancesCache[T any](tag string) (cache.CacheInterface[T], error) {
 		typ = GetType[T]()
 	}
 	typ.lock.RLock()
-	cache, ok := typ.instancesCache[tag].(cache.CacheInterface[T])
+	cache, ok := typ.instancesCache[tag].(cache.SetterCacheInterface[T])
 	typ.lock.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("invalid type %s instances cache type: %T", typ.String(), typ.instancesCache[tag])
