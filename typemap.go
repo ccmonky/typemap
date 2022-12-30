@@ -314,13 +314,12 @@ func Register[T any](ctx context.Context, key any, object T, opts ...Option) err
 	}
 	if reg, ok := cache.GetCodec().GetStore().(Registerable); ok {
 		return reg.Register(ctx, key, object, options.StoreOptions...)
-	} else {
-		if _, err := cache.Get(ctx, key); err != nil { // NOTE: not atomic!
-			if !errors.Is(err, store.NotFound{}) {
-				return err
-			} else {
-				return cache.Set(ctx, key, object, options.StoreOptions...)
-			}
+	}
+	if _, err := cache.Get(ctx, key); err != nil { // NOTE: not atomic!
+		if !errors.Is(err, store.NotFound{}) {
+			return err
+		} else {
+			return cache.Set(ctx, key, object, options.StoreOptions...)
 		}
 	}
 	return fmt.Errorf("register %s:%v failed: already exists", GetTypeIdString[T](), key)
