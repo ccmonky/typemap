@@ -326,6 +326,38 @@ func GetAnyMany(ctx context.Context, typeIdStr string, keys []any, opts ...Optio
 	return values, nil
 }
 
+func GetAll[T any](ctx context.Context, opts ...Option) (map[any]T, error) {
+	options := NewOptions(opts...)
+	cache, err := getInstancesCache[T](options.Tag, false)
+	if err != nil {
+		return nil, err
+	}
+	if ga, ok := cache.GetCodec().GetStore().(GetAllInterface); ok {
+		m, err := ga.GetAll(ctx)
+		if err != nil {
+			return nil, err
+		}
+		result := make(map[any]T, len(m))
+		for k, v := range m {
+			result[k] = v.(T)
+		}
+		return result, nil
+	}
+	return nil, fmt.Errorf("store %s not implement GetAllInterface", cache.GetCodec().GetStore().GetType())
+}
+
+func GetAnyAll(ctx context.Context, typeIdStr string, opts ...Option) (map[any]any, error) {
+	options := NewOptions(opts...)
+	cache, err := getInstancesCacheAny(typeIdStr, options.Tag)
+	if err != nil {
+		return nil, err
+	}
+	if ga, ok := cache.GetCodec().GetStore().(GetAllInterface); ok {
+		return ga.GetAll(ctx)
+	}
+	return nil, fmt.Errorf("store %s not implement GetAllInterface", cache.GetCodec().GetStore().GetType())
+}
+
 // MustRegister register a T instance into Type's instances cache, if error then panic
 func MustRegister[T any](ctx context.Context, key any, object T, opts ...Option) {
 	err := Register[T](ctx, key, object, opts...)

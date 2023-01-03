@@ -38,6 +38,10 @@ type Registerable interface {
 	Register(ctx context.Context, key any, value any, options ...store.Option) error
 }
 
+type GetAllInterface interface {
+	GetAll(ctx context.Context) (map[any]any, error)
+}
+
 // SetterCacheAnyInterface
 type SetterCacheAnyInterface interface {
 	GetAny(ctx context.Context, key any) (any, error)

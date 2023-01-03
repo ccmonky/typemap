@@ -386,6 +386,44 @@ func TestGetAny(t *testing.T) {
 	}
 }
 
+func TestGetAll(t *testing.T) {
+	ctx := context.Background()
+	err := typemap.Register[float64](ctx, "one", 1.0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = typemap.Register[float64](ctx, "two", 2.0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vs, err := typemap.GetAll[float64](ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(vs) != 2 {
+		t.Fatal("should ==")
+	}
+	if vs["one"] != 1.0 {
+		t.Fatal("should ==")
+	}
+	if vs["two"] != 2.0 {
+		t.Fatal("should ==")
+	}
+	va, err := typemap.GetAnyAll(ctx, "float64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(va) != 2 {
+		t.Fatal("should ==")
+	}
+	if va["one"].(float64) != 1.0 {
+		t.Fatal("should ==")
+	}
+	if va["two"].(float64) != 2.0 {
+		t.Fatal("should ==")
+	}
+}
+
 func BenchmarkGetTypeId(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		typemap.GetTypeId[*Gface]()

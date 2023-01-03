@@ -42,6 +42,16 @@ func (s *MapStore) Get(_ context.Context, key any) (any, error) {
 	return value, err
 }
 
+func (s *MapStore) GetAll(_ context.Context) (map[any]any, error) {
+	itemsCopy := make(map[any]any, len(s.items))
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for k, v := range s.items {
+		itemsCopy[k] = v
+	}
+	return itemsCopy, nil
+}
+
 // GetWithTTL returns data stored from a given key and its corresponding TTL
 func (s *MapStore) GetWithTTL(ctx context.Context, key any) (any, time.Duration, error) {
 	value, err := s.Get(ctx, key)
@@ -95,4 +105,6 @@ func (s *MapStore) Clear(_ context.Context) error {
 
 var (
 	_ store.StoreInterface = (*MapStore)(nil)
+	_ GetAllInterface      = (*MapStore)(nil)
+	_ Registerable         = (*MapStore)(nil)
 )

@@ -50,7 +50,8 @@ type Instances struct {
 }
 
 type Instance struct {
-	TypeID string          `json:"type_id"`
-	Name   string          `json:"name"`
-	Value  json.RawMessage `json:"value,omitempty"`
+	TypeID    string          `json:"type_id"`
+	Operation string          `json:"operation,omitempty"`
+	Name      string          `json:"name"`
+	Value     json.RawMessage `json:"value,omitempty"`
 }

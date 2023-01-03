@@ -42,6 +42,16 @@ func (s *SyncMapStore) GetWithTTL(ctx context.Context, key any) (any, time.Durat
 	return value, NoExpiration, err
 }
 
+func (s *SyncMapStore) GetAll(_ context.Context) (map[any]any, error) {
+	itemsCopy := make(map[any]any)
+	fn := func(key, value any) bool {
+		itemsCopy[key] = value
+		return true
+	}
+	s.items.Range(fn)
+	return itemsCopy, nil
+}
+
 // Register Set only when key not found
 func (s *SyncMapStore) Register(ctx context.Context, key any, value any, options ...store.Option) error {
 	_, loaded := s.items.LoadOrStore(key, value)
@@ -81,4 +91,6 @@ func (s *SyncMapStore) Clear(_ context.Context) error {
 
 var (
 	_ store.StoreInterface = (*SyncMapStore)(nil)
+	_ GetAllInterface      = (*SyncMapStore)(nil)
+	_ Registerable         = (*SyncMapStore)(nil)
 )
