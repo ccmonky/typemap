@@ -130,6 +130,7 @@ func setType[T any](typ *Type) error {
 	}
 	typ.lock.Unlock()
 	typeMap.types[typ.typeId] = typ
+	typeMap.strTypes[typeIdString(typ.typeId)] = typ
 	return nil
 }
 
@@ -151,7 +152,7 @@ type Type struct {
 	typeId         reflect.Type
 	description    string
 	dependencies   []string
-	instancesCache map[tag]any // map[tag]cache.SetterCacheInterface
+	instancesCache map[tag]any // map[tag]cache.SetterCacheInterface[T]
 	lock           sync.RWMutex
 }
 
@@ -272,23 +273,51 @@ func WithDescription(description string) TypeOption {
 // Get get instance of T from Type's instances cache
 func Get[T any](ctx context.Context, key any, opts ...Option) (T, error) {
 	options := NewOptions(opts...)
-	cache, err := getInstancesCache[T](options.Tag)
+	cache, err := getInstancesCache[T](options.Tag, false)
 	if err != nil {
 		return *new(T), err
 	}
 	return cache.Get(ctx, key)
 }
 
+// GetAny get instance of T(specified by typeIdStr) from Type's instances cache
+func GetAny(ctx context.Context, typeIdStr string, key any, opts ...Option) (any, error) {
+	options := NewOptions(opts...)
+	cache, err := getInstancesCacheAny(typeIdStr, options.Tag)
+	if err != nil {
+		return nil, err
+	}
+	return cache.GetAny(ctx, key)
+}
+
 // GetMany get multiple instances of T from Type's instances cache
 func GetMany[T any](ctx context.Context, keys []any, opts ...Option) ([]T, error) {
 	options := NewOptions(opts...)
-	cache, err := getInstancesCache[T](options.Tag)
+	cache, err := getInstancesCache[T](options.Tag, false)
 	if err != nil {
 		return nil, err
 	}
 	var values []T
 	for _, key := range keys {
 		value, err := cache.Get(ctx, key)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, value)
+	}
+	return values, nil
+}
+
+// GetAnyMany get multiple instances of T(specified by typeIdStr) from Type's instances cache
+func GetAnyMany(ctx context.Context, typeIdStr string, keys []any, opts ...Option) ([]any, error) {
+	options := NewOptions(opts...)
+	cache, err := getInstancesCacheAny(typeIdStr, options.Tag)
+	if err != nil {
+		return nil, err
+	}
+	var values []any
+	for _, key := range keys {
+		value, err := cache.GetAny(ctx, key)
 		if err != nil {
 			return nil, err
 		}
@@ -306,9 +335,10 @@ func MustRegister[T any](ctx context.Context, key any, object T, opts ...Option)
 }
 
 // Register register a T instance into Type's instances cache, if exists return error
+// if T not found, the default will be registered.
 func Register[T any](ctx context.Context, key any, object T, opts ...Option) error {
 	options := NewOptions(opts...)
-	cache, err := getInstancesCache[T](options.Tag)
+	cache, err := getInstancesCache[T](options.Tag, true)
 	if err != nil {
 		return err
 	}
@@ -334,9 +364,10 @@ func MustSet[T any](ctx context.Context, key any, object T, opts ...Option) {
 }
 
 // Set set a T instance into Type's instances cache, if exists then override it
+// if T not found, the default will be registered.
 func Set[T any](ctx context.Context, key any, object T, opts ...Option) error { // options ...store.Option
 	options := NewOptions(opts...)
-	cache, err := getInstancesCache[T](options.Tag)
+	cache, err := getInstancesCache[T](options.Tag, true)
 	if err != nil {
 		return err
 	}
@@ -352,9 +383,10 @@ func MustDelete[T any](ctx context.Context, key any, opts ...Option) {
 }
 
 // Delete delete a T instance specified by key
+// if T not found, the default will be registered.
 func Delete[T any](ctx context.Context, key any, opts ...Option) error {
 	options := NewOptions(opts...)
-	cache, err := getInstancesCache[T](options.Tag)
+	cache, err := getInstancesCache[T](options.Tag, true)
 	if err != nil {
 		return err
 	}
@@ -370,9 +402,10 @@ func MustClear[T any](ctx context.Context, opts ...Option) {
 }
 
 // Clear clear T's instances cache
+// if T not found, the default will be registered.
 func Clear[T any](ctx context.Context, opts ...Option) error {
 	options := NewOptions(opts...)
-	cache, err := getInstancesCache[T](options.Tag)
+	cache, err := getInstancesCache[T](options.Tag, true)
 	if err != nil {
 		return err
 	}
@@ -435,17 +468,37 @@ func WithStoreOption(storeOption store.Option) Option {
 	}
 }
 
-func getInstancesCache[T any](tag string) (cache.SetterCacheInterface[T], error) {
+func getInstancesCache[T any](tag string, registerType bool) (cache.SetterCacheInterface[T], error) {
 	typ := GetType[T]()
 	if typ == nil {
-		err := RegisterType[T]() // NOTE: register type first time if not found?
-		if err != nil {
-			return nil, err
+		if registerType {
+			err := RegisterType[T]() // NOTE: register type first time if not found?
+			if err != nil {
+				return nil, err
+			}
+			typ = GetType[T]()
+		} else {
+			return nil, NewNotFoundError(fmt.Sprintf("type %s not found", GetTypeIdString[T]()))
 		}
-		typ = GetType[T]()
 	}
 	typ.lock.RLock()
 	cache, ok := typ.instancesCache[tag].(cache.SetterCacheInterface[T])
+	typ.lock.RUnlock()
+	if !ok {
+		return nil, fmt.Errorf("invalid type %s instances cache type: %T", typ.String(), typ.instancesCache[tag])
+	}
+	return cache, nil
+}
+
+func getInstancesCacheAny(typeIdStr, tag string) (SetterCacheAnyInterface, error) {
+	typeMap.lock.RLock()
+	typ := typeMap.strTypes[typeIdStr]
+	typeMap.lock.RUnlock()
+	if typ == nil {
+		return nil, NewNotFoundError(fmt.Sprintf("type %s not found", typeIdStr))
+	}
+	typ.lock.RLock()
+	cache, ok := typ.instancesCache[tag].(SetterCacheAnyInterface)
 	typ.lock.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("invalid type %s instances cache type: %T", typ.String(), typ.instancesCache[tag])
@@ -482,11 +535,13 @@ func typeIdPkgPath(rtype reflect.Type) string {
 
 // TypeMap a map[TypeId]*Type, with type meta info and instances in *Type
 type TypeMap struct {
-	types map[reflect.Type]*Type
-	lock  sync.RWMutex
+	types    map[reflect.Type]*Type
+	strTypes map[string]*Type
+	lock     sync.RWMutex
 }
 
 // global TypeMap
 var typeMap = &TypeMap{
-	types: make(map[reflect.Type]*Type),
+	types:    make(map[reflect.Type]*Type),
+	strTypes: make(map[string]*Type),
 }

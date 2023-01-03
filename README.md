@@ -13,7 +13,6 @@ go get -u github.com/ccmonky/typemap
 ```
 
 ```go
-err := typemap.RegisterType[*Demo]()
-err = typemap.Register[*Demo](ctx, "first", &Demo{})
-demo, err = typemap.Get[*Demo](ctx, "first")
+err := typemap.Register[*Demo](ctx, "first", &Demo{})
+demo, err := typemap.Get[*Demo](ctx, "first")
 ```

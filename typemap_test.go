@@ -3,13 +3,10 @@ package typemap_test
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"testing"
 
 	"github.com/ccmonky/typemap"
-	"github.com/eko/gocache/lib/v4/cache"
-	"github.com/eko/gocache/lib/v4/store"
 )
 
 func TestRegisterTypeMultipleTimes(t *testing.T) {
@@ -27,7 +24,7 @@ type NotRegister string
 
 func TestNotRegisterType(t *testing.T) {
 	_, err := typemap.Get[NotRegister](context.Background(), "xxx")
-	if !errors.Is(err, store.NotFound{}) {
+	if !typemap.IsNotFound(err) {
 		t.Fatal("should be store.NotFound")
 	}
 }
@@ -67,7 +64,7 @@ func TestType(t *testing.T) {
 	}
 	instancesCache := m["instances_cache"].(map[string]any)
 	tagCache := instancesCache[""].(map[string]any)
-	if tagCache["cache_type"].(string) != "cache" {
+	if tagCache["cache_type"].(string) != "cache_any" {
 		t.Errorf("cache_type got %v", tagCache["cache_type"])
 	}
 	if tagCache["store_type"].(string) != "map" {
@@ -81,7 +78,7 @@ func TestMapStore(t *testing.T) {
 	testTypeMap[*StructMap](t, first, second, &typemap.Options{})
 	typ := typemap.GetType[*StructMap]()
 	assertNotNil(t, typ, "GetType of *StructMap should not nil")
-	c := typ.InstancesCache("").(*cache.Cache[*StructMap])
+	c := typ.InstancesCache("").(*typemap.CacheAny[*StructMap])
 	if c.GetCodec().GetStore().GetType() != "map" {
 		t.Error()
 	}
@@ -89,7 +86,7 @@ func TestMapStore(t *testing.T) {
 
 func TestSyncMapStore(t *testing.T) {
 	syncStore := typemap.NewSyncMap()
-	c := cache.New[*StructSyncMap](syncStore)
+	c := typemap.NewCacheAny[*StructSyncMap](syncStore)
 	options := &typemap.Options{
 		TypeOptions: []typemap.TypeOption{
 			typemap.WithInstancesCache[*StructSyncMap]("", c),
@@ -100,7 +97,7 @@ func TestSyncMapStore(t *testing.T) {
 	testTypeMap[*StructSyncMap](t, first, second, options)
 	typ := typemap.GetType[*StructSyncMap]()
 	assertNotNil(t, typ, "GetType of *StructSyncMap should not nil")
-	c = typ.InstancesCache("").(*cache.Cache[*StructSyncMap])
+	c = typ.InstancesCache("").(*typemap.CacheAny[*StructSyncMap])
 	if c.GetCodec().GetStore().GetType() != "syncmap" {
 		t.Errorf("should be sync store, got %s", c.GetCodec().GetStore().GetType())
 	}
@@ -118,7 +115,7 @@ func TestWithTag(t *testing.T) {
 	testTypeMap[*StructMap](t, first, second, options)
 	typ := typemap.GetType[*StructMap]()
 	assertNotNil(t, typ, "GetType of *StructMap should not nil")
-	c := typ.InstancesCache("xxx").(*cache.Cache[*StructMap])
+	c := typ.InstancesCache("xxx").(*typemap.CacheAny[*StructMap])
 	if c.GetCodec().GetStore().GetType() != "map" {
 		t.Error()
 	}
@@ -353,6 +350,38 @@ func TestGetMany(t *testing.T) {
 		t.Fatal("should ==")
 	}
 	if ints[1] != 2 {
+		t.Fatal("should ==")
+	}
+}
+
+func TestGetAny(t *testing.T) {
+	ctx := context.Background()
+	err := typemap.Register[uint64](ctx, "one", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := typemap.GetAny(ctx, "uint64", "one")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.(uint64) != 1 {
+		t.Fatal("should ==")
+	}
+	err = typemap.Register[uint64](ctx, "two", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vs, err := typemap.GetAnyMany(ctx, "uint64", []any{"one", "two"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(vs) != 2 {
+		t.Fatal("should ==")
+	}
+	if vs[0].(uint64) != 1 {
+		t.Fatal("should ==")
+	}
+	if vs[1].(uint64) != 2 {
 		t.Fatal("should ==")
 	}
 }

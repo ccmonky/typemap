@@ -26,7 +26,7 @@ func NewDefaultCache[T any]() cache.SetterCacheInterface[T] {
 		}
 		return NewLoadable[T](loader, cache.New[T](NewMap()))
 	}
-	return cache.New[T](NewMap())
+	return NewCacheAny[T](NewMap())
 }
 
 // New create a new T's instance, and New will indirect reflect.Ptr recursively to ensure not return nil pointer
