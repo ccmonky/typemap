@@ -40,13 +40,14 @@ func RegisterType[T any](opts ...TypeOption) error {
 		needSetType = true
 		typ = &Type{
 			typeId:         typeId,
+			new:            func() any { return DerefNew[T]() },
 			instancesCache: options.InstancesCache,
 		}
 		var instance any
 		if options.UseDependencies {
 			typ.dependencies = options.Dependencies
 		} else {
-			instance = New[T]()
+			instance = Zero[T]()
 			if dep, ok := instance.(Dependencies); ok {
 				typ.dependencies = dep.Dependencies()
 			}
@@ -55,7 +56,7 @@ func RegisterType[T any](opts ...TypeOption) error {
 			typ.description = options.Description
 		} else {
 			if instance == nil {
-				instance = New[T]()
+				instance = Zero[T]()
 			}
 			if dep, ok := instance.(Description); ok {
 				typ.description = dep.Description()
@@ -110,6 +111,7 @@ func SetType[T any](opts ...TypeOption) error {
 	defer typeMap.lock.Unlock()
 	typ := &Type{
 		typeId:         GetTypeId[T](),
+		new:            func() any { return DerefNew[T]() },
 		instancesCache: options.InstancesCache,
 		dependencies:   options.Dependencies,
 		description:    options.Description,
@@ -154,18 +156,31 @@ func GetType[T any]() *Type {
 	return typeMap.types[GetTypeId[T]()]
 }
 
+// GetTypeByID get *Type corresponding to TypeIdStr from global TypeMap
+func GetTypeByID(typeIdStr string) *Type {
+	typeMap.lock.RLock()
+	defer typeMap.lock.RUnlock()
+	return typeMap.strTypes[typeIdStr]
+}
+
 type Type struct {
 	typeId         reflect.Type
 	description    string
 	dependencies   []string
 	instancesCache map[tag]any // map[tag]cache.SetterCacheInterface[T]
 	lock           sync.RWMutex
+	new            func() any
 }
 
 type tag = string
 
 func (typ *Type) TypeId() reflect.Type {
 	return typ.typeId
+}
+
+// New returns a instance pointer of T(Dereferenced), used to unmarshal
+func (typ *Type) New() any {
+	return typ.new()
 }
 
 func (typ *Type) String() string {

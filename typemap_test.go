@@ -424,12 +424,6 @@ func TestGetAll(t *testing.T) {
 	}
 }
 
-func BenchmarkGetTypeId(b *testing.B) {
-	for n := 0; n < b.N; n++ {
-		typemap.GetTypeId[*Gface]()
-	}
-}
-
 func TestSetAny(t *testing.T) {
 	ctx := context.Background()
 	err := typemap.RegisterType[float32]()
@@ -457,6 +451,56 @@ func TestSetAny(t *testing.T) {
 	}
 	if r != 4.0 {
 		t.Fatalf("should == 4.0, got %v", r)
+	}
+}
+
+type NewTest struct {
+	S string `json:"s"`
+}
+
+func TestTypeNew(t *testing.T) {
+	err := typemap.RegisterType[NewTest]()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = typemap.RegisterType[*NewTest]()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = typemap.RegisterType[**NewTest]()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tid := range []string{
+		"github.com/ccmonky/typemap_test.NewTest",
+		"github.com/ccmonky/*typemap_test.NewTest",
+		"github.com/ccmonky/**typemap_test.NewTest",
+	} {
+		typ := typemap.GetTypeByID(tid)
+		if typ == nil {
+			t.Fatal("shoudl not nil")
+		}
+		n := typ.New()
+		if nt, ok := n.(*NewTest); !ok {
+			t.Fatalf("should be *ZeroTest, got %T", n)
+		} else {
+			if nt.S != "" {
+				t.Fatal("should ==")
+			}
+		}
+		err = json.Unmarshal([]byte(`{"s": "abc"}`), &n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n.(*NewTest).S != "abc" {
+			t.Fatal("should ==")
+		}
+	}
+}
+
+func BenchmarkGetTypeId(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		typemap.GetTypeId[*Gface]()
 	}
 }
 

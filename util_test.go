@@ -141,9 +141,9 @@ func TestNewDefaultCacheImplLoadable(t *testing.T) {
 	}
 }
 
-func TestNew(t *testing.T) {
+func TestZero(t *testing.T) {
 	var v any
-	v = typemap.New[DefaultType]()
+	v = typemap.Zero[DefaultType]()
 	if dt, ok := v.(DefaultType); !ok {
 		t.Fatalf("should ok, got %T", v)
 	} else {
@@ -151,7 +151,7 @@ func TestNew(t *testing.T) {
 			t.Fatal("should ==")
 		}
 	}
-	v = typemap.New[*DefaultType]()
+	v = typemap.Zero[*DefaultType]()
 	if dt, ok := v.(*DefaultType); !ok {
 		t.Fatalf("should ok, got %T", v)
 	} else {
@@ -159,7 +159,7 @@ func TestNew(t *testing.T) {
 			t.Fatal("should ==")
 		}
 	}
-	v = typemap.New[**DefaultType]()
+	v = typemap.Zero[**DefaultType]()
 	if dt, ok := v.(**DefaultType); !ok {
 		t.Fatalf("should ok, got %T", v)
 	} else {
@@ -167,17 +167,85 @@ func TestNew(t *testing.T) {
 			t.Fatal("should ==")
 		}
 	}
-	v1 := typemap.New[chan bool]()
+	v1 := typemap.Zero[chan bool]()
 	if v1 != nil {
 		t.Fatal("new func should return nil")
 	}
-	v2 := typemap.New[Iface]()
+	v2 := typemap.Zero[Iface]()
 	if v2 != nil {
 		t.Fatal("new interface should return nil")
 	}
-	v3 := typemap.New[func()]()
+	v3 := typemap.Zero[func()]()
 	if v3 != nil {
 		t.Fatal("new func should return nil")
+	}
+}
+
+func TestNew(t *testing.T) {
+	var v any
+	v = typemap.New[DefaultType]()
+	if dt, ok := v.(*DefaultType); !ok {
+		t.Fatalf("should ok, got %T", v)
+	} else {
+		if dt.Value != "" {
+			t.Fatal("should ==")
+		}
+	}
+	v = typemap.New[*DefaultType]()
+	if dt, ok := v.(**DefaultType); !ok {
+		t.Fatalf("should ok, got %T", v)
+	} else {
+		if (*dt).Value != "" {
+			t.Fatal("should ==")
+		}
+	}
+	v = typemap.New[**DefaultType]()
+	if dt, ok := v.(***DefaultType); !ok {
+		t.Fatalf("should ok, got %T", v)
+	} else {
+		if (*(*dt)).Value != "" {
+			t.Fatal("should ==")
+		}
+	}
+	v1 := typemap.New[chan bool]()
+	if v1 == nil {
+		t.Fatalf("new chan should return not nil, got %v", v1)
+	}
+	v2 := typemap.New[Iface]()
+	if v2 == nil {
+		t.Fatalf("new interface should return not nil, got %v", v2)
+	}
+	v3 := typemap.New[func()]()
+	if v3 == nil {
+		t.Fatalf("new func should return not nil, got %v", v3)
+	}
+}
+
+func TestNewOrZero(t *testing.T) {
+	var v any
+	v = typemap.DerefNew[DefaultType]()
+	if dt, ok := v.(*DefaultType); !ok {
+		t.Fatalf("should ok, got %T", v)
+	} else {
+		if dt.Value != "" {
+			t.Fatal("should ==")
+		}
+	}
+	v = typemap.DerefNew[*DefaultType]()
+	if dt, ok := v.(*DefaultType); !ok {
+		t.Fatalf("should ok, got %T", v)
+	} else {
+		if dt.Value != "" {
+			t.Fatal("should ==")
+		}
+	}
+	v = typemap.DerefNew[**DefaultType]()
+	if dt, ok := v.(*DefaultType); !ok {
+		t.Fatalf("should ok, got %T", v)
+	} else {
+		if dt.Value != "" {
+			t.Fatal("should ==")
+		}
 	}
 }
 

@@ -13,7 +13,7 @@ import (
 // - if T implements `Default`, returns a `cache.NewLoadable` with Default as LoadFunction
 // - otherwise, return a `cache.New`
 func NewDefaultCache[T any]() cache.SetterCacheInterface[T] {
-	var value any = New[T]()
+	var value any = Zero[T]()
 	if loader, ok := value.(Loadable[T]); ok {
 		return NewLoadable[T](loader.Load, cache.New[T](NewMap()))
 	}
@@ -29,8 +29,8 @@ func NewDefaultCache[T any]() cache.SetterCacheInterface[T] {
 	return NewCacheAny[T](NewMap())
 }
 
-// New create a new T's instance, and New will indirect reflect.Ptr recursively to ensure not return nil pointer
-func New[T any]() T {
+// Zero create a new T's instance, and New will indirect reflect.Ptr recursively to ensure not return nil pointer
+func Zero[T any]() T {
 	var level int
 	typ := GetTypeId[T]()
 	for ; typ.Kind() == reflect.Ptr; typ = typ.Elem() {
@@ -46,6 +46,37 @@ func New[T any]() T {
 		value = p
 	}
 	return value.Interface().(T)
+}
+
+// New create a new T's instance pointer, and New will indirect reflect.Ptr recursively to ensure not return nil pointer
+func New[T any]() *T {
+	var level int
+	typ := GetTypeId[T]()
+	for ; typ.Kind() == reflect.Ptr; typ = typ.Elem() {
+		level++
+	}
+	if level == 0 {
+		return new(T)
+	}
+	value := reflect.New(typ)
+	for i := 0; i < level; i++ {
+		p := reflect.New(value.Type())
+		p.Elem().Set(value)
+		value = p
+	}
+	return value.Interface().(*T)
+}
+
+func DerefNew[T any]() any {
+	var level int
+	typ := GetTypeId[T]()
+	for ; typ.Kind() == reflect.Ptr; typ = typ.Elem() {
+		level++
+	}
+	if level == 0 {
+		return new(T)
+	}
+	return reflect.New(typ).Interface()
 }
 
 // NewConstructor return a constructor func which return a *Impl instance that implements interface Iface
