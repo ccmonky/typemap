@@ -57,13 +57,13 @@ func SetAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		typ := GetTypeByID(instance.TypeID)
 		if typ == nil {
-			render(w, http.StatusBadRequest, "type %s not registered", instance.TypeID)
+			render(w, http.StatusInternalServerError, "type %s not registered", instance.TypeID)
 			return
 		}
 		n := typ.New()
 		err = json.Unmarshal(instance.Value, &n)
 		if err != nil {
-			render(w, http.StatusBadRequest, "type %s not unmarshal value failed: %v", instance.TypeID, err)
+			render(w, http.StatusInternalServerError, "type %s not unmarshal value failed: %v", instance.TypeID, err)
 			return
 		}
 		switch instance.Operation {
@@ -73,7 +73,7 @@ func SetAPI(w http.ResponseWriter, r *http.Request) {
 			err = SetAny(r.Context(), instance.TypeID, instance.Name, typ.Deref(n))
 		}
 		if err != nil {
-			render(w, http.StatusBadRequest, "type %s %s %s:%v failed: %v",
+			render(w, http.StatusInternalServerError, "type %s %s %s:%v failed: %v",
 				instance.TypeID, instance.Operation, instance.Name, n, err)
 			return
 		}
@@ -106,19 +106,19 @@ func GetAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		value, err := GetAny(r.Context(), typ.String(), instance.Name)
 		if err != nil {
-			render(w, http.StatusBadRequest, "type %s get %s failed: %v", instance.TypeID, instance.Name, err)
+			render(w, http.StatusInternalServerError, "type %s get %s failed: %v", instance.TypeID, instance.Name, err)
 			return
 		}
 		data, err := json.Marshal(value)
 		if err != nil {
-			render(w, http.StatusBadRequest, "type %s marshal %s failed: %v", instance.TypeID, instance.Name, err)
+			render(w, http.StatusInternalServerError, "type %s marshal %s failed: %v", instance.TypeID, instance.Name, err)
 			return
 		}
 		instance.Value = json.RawMessage(data)
 	}
 	data, err = json.Marshal(instances)
 	if err != nil {
-		render(w, http.StatusBadRequest, "marshal instances failed: %v", err)
+		render(w, http.StatusInternalServerError, "marshal instances failed: %v", err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -144,12 +144,12 @@ func DeleteAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		typ := GetTypeByID(instance.TypeID)
 		if typ == nil {
-			render(w, http.StatusBadRequest, "type %s not registered", instance.TypeID)
+			render(w, http.StatusInternalServerError, "type %s not registered", instance.TypeID)
 			return
 		}
 		err = DeleteAny(r.Context(), typ.String(), instance.Name)
 		if err != nil {
-			render(w, http.StatusBadRequest, "type %s delete %s failed: %v", instance.TypeID, instance.Name, err)
+			render(w, http.StatusInternalServerError, "type %s delete %s failed: %v", instance.TypeID, instance.Name, err)
 			return
 		}
 	}
