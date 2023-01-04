@@ -644,6 +644,8 @@ func typeIdPkgPath(rtype reflect.Type) string {
 }
 
 // TypeMap a map[TypeId]*Type, with type meta info and instances in *Type
+// Limitation:
+// - do not support multiple TypeMap instances since `golang method must have no type parameters`
 type TypeMap struct {
 	types    map[reflect.Type]*Type
 	strTypes map[string]*Type
