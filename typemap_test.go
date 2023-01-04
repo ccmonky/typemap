@@ -430,6 +430,36 @@ func BenchmarkGetTypeId(b *testing.B) {
 	}
 }
 
+func TestSetAny(t *testing.T) {
+	ctx := context.Background()
+	err := typemap.RegisterType[float32]()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = typemap.RegisterAny(ctx, "float32", "3", float32(3.0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := typemap.Get[float32](ctx, "3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != 3.0 {
+		t.Fatalf("should == 3.0, got %v", r)
+	}
+	err = typemap.SetAny(ctx, "float32", "3", float32(4.0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err = typemap.Get[float32](ctx, "3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != 4.0 {
+		t.Fatalf("should == 4.0, got %v", r)
+	}
+}
+
 func BenchmarkRegisterTypeMultiple(b *testing.B) {
 	err := typemap.RegisterType[uint32]()
 	if err != nil {

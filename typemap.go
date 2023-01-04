@@ -393,6 +393,27 @@ func Register[T any](ctx context.Context, key any, object T, opts ...Option) err
 	return fmt.Errorf("register %s:%v failed: already exists", GetTypeIdString[T](), key)
 }
 
+// RegisterAny register a T(specified by typeIdStr) instance into Type's instances cache, if exists return error
+// if T not found, the default will be registered.
+func RegisterAny(ctx context.Context, typeIdStr string, key any, object any, opts ...Option) error {
+	options := NewOptions(opts...)
+	cache, err := getInstancesCacheAny(typeIdStr, options.Tag)
+	if err != nil {
+		return err
+	}
+	if reg, ok := cache.GetCodec().GetStore().(Registerable); ok {
+		return reg.Register(ctx, key, object, options.StoreOptions...)
+	}
+	if _, err := cache.GetAny(ctx, key); err != nil { // NOTE: not atomic!
+		if !errors.Is(err, store.NotFound{}) {
+			return err
+		} else {
+			return cache.SetAny(ctx, key, object, options.StoreOptions...)
+		}
+	}
+	return fmt.Errorf("register any %s:%v failed: already exists", typeIdStr, key)
+}
+
 // MustSet set a T instance into Type's instances cache, if error then panic
 func MustSet[T any](ctx context.Context, key any, object T, opts ...Option) {
 	err := Set[T](ctx, key, object, opts...)
@@ -410,6 +431,17 @@ func Set[T any](ctx context.Context, key any, object T, opts ...Option) error { 
 		return err
 	}
 	return cache.Set(ctx, key, object, options.StoreOptions...)
+}
+
+// SetAny set a T instance(specified by typeIdStr) into Type's instances cache, if exists then override it
+// if T not found, the default will be registered.
+func SetAny(ctx context.Context, typeIdStr string, key any, object any, opts ...Option) error { // options ...store.Option
+	options := NewOptions(opts...)
+	cache, err := getInstancesCacheAny(typeIdStr, options.Tag)
+	if err != nil {
+		return err
+	}
+	return cache.SetAny(ctx, key, object, options.StoreOptions...)
 }
 
 // MustDelete  delete a T instance specified by key, if error then panic
