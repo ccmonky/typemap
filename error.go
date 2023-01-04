@@ -1,6 +1,10 @@
 package typemap
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/eko/gocache/lib/v4/store"
+)
 
 func NewNotFoundError(label string) *NotFoundError {
 	return &NotFoundError{
@@ -22,5 +26,5 @@ func IsNotFound(err error) bool {
 		return false
 	}
 	var e *NotFoundError
-	return errors.As(err, &e)
+	return errors.As(err, &e) || errors.Is(err, store.NotFound{})
 }

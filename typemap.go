@@ -129,8 +129,14 @@ func setType[T any](typ *Type) error {
 		}
 	}
 	typ.lock.Unlock()
+	typeIdStr := typeIdString(typ.typeId)
+	if t, ok := typeMap.strTypes[typeIdStr]; ok {
+		if t.typeId != typ.typeId {
+			return fmt.Errorf("type %s and %s with same type id string", t.String(), typ.String())
+		}
+	}
+	typeMap.strTypes[typeIdStr] = typ
 	typeMap.types[typ.typeId] = typ
-	typeMap.strTypes[typeIdString(typ.typeId)] = typ
 	return nil
 }
 
