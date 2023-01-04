@@ -40,7 +40,8 @@ func RegisterType[T any](opts ...TypeOption) error {
 		needSetType = true
 		typ = &Type{
 			typeId:         typeId,
-			new:            func() any { return DerefNew[T]() },
+			new:            func() any { return New[T]() },
+			deref:          func(n any) any { p := n.(*T); return *p },
 			instancesCache: options.InstancesCache,
 		}
 		var instance any
@@ -111,7 +112,8 @@ func SetType[T any](opts ...TypeOption) error {
 	defer typeMap.lock.Unlock()
 	typ := &Type{
 		typeId:         GetTypeId[T](),
-		new:            func() any { return DerefNew[T]() },
+		new:            func() any { return New[T]() },
+		deref:          func(n any) any { p := n.(*T); return *p },
 		instancesCache: options.InstancesCache,
 		dependencies:   options.Dependencies,
 		description:    options.Description,
@@ -170,6 +172,7 @@ type Type struct {
 	instancesCache map[tag]any // map[tag]cache.SetterCacheInterface[T]
 	lock           sync.RWMutex
 	new            func() any
+	deref          func(v any) any
 }
 
 type tag = string
@@ -181,6 +184,10 @@ func (typ *Type) TypeId() reflect.Type {
 // New returns a instance pointer of T(Dereferenced), used to unmarshal
 func (typ *Type) New() any {
 	return typ.new()
+}
+
+func (typ *Type) Deref(v any) any {
+	return typ.deref(v)
 }
 
 func (typ *Type) String() string {
@@ -478,6 +485,15 @@ func Delete[T any](ctx context.Context, key any, opts ...Option) error {
 	return cache.Delete(ctx, key)
 }
 
+func DeleteAny(ctx context.Context, typeIdStr string, key any, opts ...Option) error {
+	options := NewOptions(opts...)
+	cache, err := getInstancesCacheAny(typeIdStr, options.Tag)
+	if err != nil {
+		return err
+	}
+	return cache.Delete(ctx, key)
+}
+
 // MustClear clear T's instances cache, if error then panic
 func MustClear[T any](ctx context.Context, opts ...Option) {
 	err := Clear[T](ctx, opts...)
@@ -491,6 +507,15 @@ func MustClear[T any](ctx context.Context, opts ...Option) {
 func Clear[T any](ctx context.Context, opts ...Option) error {
 	options := NewOptions(opts...)
 	cache, err := getInstancesCache[T](options.Tag, true)
+	if err != nil {
+		return err
+	}
+	return cache.Clear(ctx)
+}
+
+func ClearAny(ctx context.Context, typeIdStr string, opts ...Option) error {
+	options := NewOptions(opts...)
+	cache, err := getInstancesCacheAny(typeIdStr, options.Tag)
 	if err != nil {
 		return err
 	}

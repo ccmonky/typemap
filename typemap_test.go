@@ -481,19 +481,59 @@ func TestTypeNew(t *testing.T) {
 			t.Fatal("shoudl not nil")
 		}
 		n := typ.New()
-		if nt, ok := n.(*NewTest); !ok {
-			t.Fatalf("should be *ZeroTest, got %T", n)
-		} else {
-			if nt.S != "" {
-				t.Fatal("should ==")
+		if tid == "github.com/ccmonky/typemap_test.NewTest" {
+			d := typ.Deref(n)
+			if dt, ok := d.(NewTest); !ok {
+				t.Fatalf("%s should be *NewTest, got %T", tid, d)
+			} else {
+				if dt.S != "" {
+					t.Fatalf("%s new S should ==''", tid)
+				}
+			}
+			err = json.Unmarshal([]byte(`{"s": "abc"}`), &n)
+			if err != nil {
+				t.Fatal(err)
+			}
+			d = typ.Deref(n)
+			if d.(NewTest).S != "abc" {
+				t.Fatalf("%s unmarshal S should == abc, got %v", tid, d.(NewTest).S)
 			}
 		}
-		err = json.Unmarshal([]byte(`{"s": "abc"}`), &n)
-		if err != nil {
-			t.Fatal(err)
+		if tid == "github.com/ccmonky/*typemap_test.NewTest" {
+			d := typ.Deref(n)
+			if dt, ok := d.(*NewTest); !ok {
+				t.Fatalf("%s should be *NewTest, got %T", tid, d)
+			} else {
+				if dt.S != "" {
+					t.Fatalf("%s new S should ==''", tid)
+				}
+			}
+			err = json.Unmarshal([]byte(`{"s": "abc"}`), &n)
+			if err != nil {
+				t.Fatal(err)
+			}
+			d = typ.Deref(n)
+			if (d.(*NewTest)).S != "abc" {
+				t.Fatalf("%s unmarshal S should == abc", tid)
+			}
 		}
-		if n.(*NewTest).S != "abc" {
-			t.Fatal("should ==")
+		if tid == "github.com/ccmonky/**typemap_test.NewTest" {
+			d := typ.Deref(n)
+			if dt, ok := d.(**NewTest); !ok {
+				t.Fatalf("%s should be *NewTest, got %T", tid, d)
+			} else {
+				if (*dt).S != "" {
+					t.Fatalf("%s new S should ==''", tid)
+				}
+			}
+			err = json.Unmarshal([]byte(`{"s": "abc"}`), &n)
+			if err != nil {
+				t.Fatal(err)
+			}
+			d = typ.Deref(n)
+			if (*(d.(**NewTest))).S != "abc" {
+				t.Fatalf("%s unmarshal S should == abc", tid)
+			}
 		}
 	}
 }
