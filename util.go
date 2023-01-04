@@ -67,18 +67,6 @@ func New[T any]() *T {
 	return value.Interface().(*T)
 }
 
-func DerefNew[T any]() any {
-	var level int
-	typ := GetTypeId[T]()
-	for ; typ.Kind() == reflect.Ptr; typ = typ.Elem() {
-		level++
-	}
-	if level == 0 {
-		return new(T)
-	}
-	return reflect.New(typ).Interface()
-}
-
 // NewConstructor return a constructor func which return a *Impl instance that implements interface Iface
 func NewConstructor[Impl, Iface any]() func() Iface {
 	return func() Iface {

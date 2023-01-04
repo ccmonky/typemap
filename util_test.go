@@ -221,34 +221,6 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func TestNewOrZero(t *testing.T) {
-	var v any
-	v = typemap.DerefNew[DefaultType]()
-	if dt, ok := v.(*DefaultType); !ok {
-		t.Fatalf("should ok, got %T", v)
-	} else {
-		if dt.Value != "" {
-			t.Fatal("should ==")
-		}
-	}
-	v = typemap.DerefNew[*DefaultType]()
-	if dt, ok := v.(*DefaultType); !ok {
-		t.Fatalf("should ok, got %T", v)
-	} else {
-		if dt.Value != "" {
-			t.Fatal("should ==")
-		}
-	}
-	v = typemap.DerefNew[**DefaultType]()
-	if dt, ok := v.(*DefaultType); !ok {
-		t.Fatalf("should ok, got %T", v)
-	} else {
-		if dt.Value != "" {
-			t.Fatal("should ==")
-		}
-	}
-}
-
 func TestNewConstructor(t *testing.T) {
 	err := typemap.RegisterType[func() Iface]()
 	if err != nil {
