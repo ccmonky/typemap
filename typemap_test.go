@@ -538,6 +538,43 @@ func TestTypeNew(t *testing.T) {
 	}
 }
 
+type TypeMapsTest struct {
+	String string
+}
+
+func TestTypeMaps(t *testing.T) {
+	ctx := context.Background()
+	err := typemap.Register[*TypeMapsTest](ctx, "1", &TypeMapsTest{String: "1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = typemap.Register[*TypeMapsTest](ctx, "1", &TypeMapsTest{String: "2"},
+		typemap.WithTypeOption(typemap.WithTypeMapName("second")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := typemap.GetAll[*TypeMapsTest](ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m) != 1 {
+		t.Fatal(err)
+	}
+	if m["1"].String != "1" {
+		t.Error("should ==")
+	}
+	m, err = typemap.GetAll[*TypeMapsTest](ctx, typemap.WithTypeOption(typemap.WithTypeMapName("second")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m) != 1 {
+		t.Fatal(err)
+	}
+	if m["1"].String != "2" {
+		t.Error("should ==")
+	}
+}
+
 func BenchmarkGetTypeId(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		typemap.GetTypeId[*Gface]()
