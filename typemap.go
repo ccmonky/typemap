@@ -30,7 +30,7 @@ func RegisterType[T any](opts ...TypeOption) error {
 	typeId := GetTypeId[T]()
 	options := NewTypeOptions(opts...)
 	var needSetType bool
-	typeMap := globalTypeMaps.Load(options.TypeMapName)
+	typeMap := globalTypeMaps.LoadOrNew(options.TypeMapName)
 	typeMap.lock.RLock()
 	typ := typeMap.types[typeId]
 	typeMap.lock.RUnlock()
@@ -103,7 +103,7 @@ func MustSetType[T any](opts ...TypeOption) {
 // - can specify T's dependencies(a slice of TypeId) with `WithDependencies`
 func SetType[T any](opts ...TypeOption) error {
 	options := NewTypeOptions(opts...)
-	typeMap := globalTypeMaps.Load(options.TypeMapName)
+	typeMap := globalTypeMaps.LoadOrNew(options.TypeMapName)
 	typeMap.lock.Lock()
 	defer typeMap.lock.Unlock()
 	typ := &Type{
@@ -143,7 +143,7 @@ func setType[T any](typeMap *TypeMap, typ *Type) error {
 // Types returns all Types
 func Types(opts ...TypeOption) map[reflect.Type]*Type {
 	options := NewTypeOptions(opts...)
-	typeMap := globalTypeMaps.Load(options.TypeMapName)
+	typeMap := globalTypeMaps.LoadOrNew(options.TypeMapName)
 	typeMap.lock.RLock()
 	defer typeMap.lock.RUnlock()
 	return typeMap.types
@@ -152,7 +152,7 @@ func Types(opts ...TypeOption) map[reflect.Type]*Type {
 // GetType get *Type corresponding to T from global TypeMap
 func GetType[T any](opts ...TypeOption) *Type {
 	options := NewTypeOptions(opts...)
-	typeMap := globalTypeMaps.Load(options.TypeMapName)
+	typeMap := globalTypeMaps.LoadOrNew(options.TypeMapName)
 	typeMap.lock.RLock()
 	defer typeMap.lock.RUnlock()
 	return typeMap.types[GetTypeId[T]()]
@@ -161,7 +161,7 @@ func GetType[T any](opts ...TypeOption) *Type {
 // GetTypeByID get *Type corresponding to TypeIdStr from global TypeMap
 func GetTypeByID(typeIdStr string, opts ...TypeOption) *Type {
 	options := NewTypeOptions(opts...)
-	typeMap := globalTypeMaps.Load(options.TypeMapName)
+	typeMap := globalTypeMaps.LoadOrNew(options.TypeMapName)
 	typeMap.lock.RLock()
 	defer typeMap.lock.RUnlock()
 	return typeMap.strTypes[typeIdStr]
@@ -673,7 +673,8 @@ type typeMaps struct {
 	tms sync.Map // map[string]*TypeMap
 }
 
-func (tms *typeMaps) Load(typeMapName string) *TypeMap {
+// LoadOrNew load *TypeMap by typeMapName, if not found create a new *TypeMap and store it
+func (tms *typeMaps) LoadOrNew(typeMapName string) *TypeMap {
 	tm, _ := tms.tms.LoadOrStore(typeMapName, &TypeMap{
 		types:    make(map[reflect.Type]*Type),
 		strTypes: make(map[string]*Type),
