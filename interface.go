@@ -54,3 +54,7 @@ type SetterCacheAnyInterface interface {
 	GetType() string
 	GetCodec() codec.CodecInterface
 }
+
+type AttrGetter[T any] interface {
+	GetAttr(v any, attr string) (T, error)
+}
