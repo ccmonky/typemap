@@ -133,6 +133,20 @@ func (ra *RefAttr[T, A]) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// V is alias of `MustValue`
+func (ra *RefAttr[T, A]) V(ctx context.Context, opts ...Option) A {
+	return ra.MustValue(ctx, opts...)
+}
+
+// MustValue returns the referenced value, panic if error
+func (ra *RefAttr[T, A]) MustValue(ctx context.Context, opts ...Option) A {
+	v, err := ra.Value(ctx, opts...)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
 func (ra *RefAttr[T, A]) Value(ctx context.Context, opts ...Option) (A, error) {
 	load := func() (A, error) {
 		tv, err := Get[T](ctx, ra.Name, opts...)
