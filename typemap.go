@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	"sync"
 
 	"github.com/eko/gocache/lib/v4/cache"
@@ -27,7 +26,7 @@ func MustRegisterType[T any](opts ...TypeOption) {
 //   default to `cache.New[T](NewMap())`, if tag cache exists then return already eixsts error
 // - can specify T's dependencies(a slice of TypeId) with `WithDependencies`
 func RegisterType[T any](opts ...TypeOption) error {
-	typeId := GetTypeId[T]()
+	typeId := TypeOf[T]()
 	options := NewTypeOptions(opts...)
 	var needSetType bool
 	typeMap := globalTypeMaps.LoadOrNew(options.TypeMapName)
@@ -107,7 +106,7 @@ func SetType[T any](opts ...TypeOption) error {
 	typeMap.lock.Lock()
 	defer typeMap.lock.Unlock()
 	typ := &Type{
-		typeId:         GetTypeId[T](),
+		typeId:         TypeOf[T](),
 		new:            func() any { return New[T]() },
 		deref:          func(n any) any { p := n.(*T); return *p },
 		instancesCache: options.InstancesCache,
@@ -129,7 +128,7 @@ func setType[T any](typeMap *TypeMap, typ *Type) error {
 		}
 	}
 	typ.lock.Unlock()
-	typeIdStr := typeIdString(typ.typeId)
+	typeIdStr := TypeId{typ.typeId}.String()
 	if t, ok := typeMap.strTypes[typeIdStr]; ok {
 		if t.typeId != typ.typeId {
 			return fmt.Errorf("type %s and %s with same type id string", t.String(), typ.String())
@@ -155,7 +154,7 @@ func GetType[T any](opts ...TypeOption) *Type {
 	typeMap := globalTypeMaps.LoadOrNew(options.TypeMapName)
 	typeMap.lock.RLock()
 	defer typeMap.lock.RUnlock()
-	return typeMap.types[GetTypeId[T]()]
+	return typeMap.types[TypeOf[T]()]
 }
 
 // GetTypeByID get *Type corresponding to TypeIdStr from global TypeMap
@@ -193,11 +192,11 @@ func (typ *Type) Deref(v any) any {
 }
 
 func (typ *Type) String() string {
-	return typeIdString(typ.typeId)
+	return TypeId{typ.typeId}.String()
 }
 
 func (typ *Type) PkgPath() string {
-	return typeIdPkgPath(typ.typeId)
+	return TypeId{typ.typeId}.PkgPath()
 }
 
 func (typ *Type) InstancesCache(tag string) any {
@@ -430,7 +429,7 @@ func Register[T any](ctx context.Context, key any, object T, opts ...Option) err
 			return cache.Set(ctx, key, object, options.StoreOptions...)
 		}
 	}
-	return fmt.Errorf("register %s:%v failed: already exists", GetTypeIdString[T](), key)
+	return fmt.Errorf("register %s:%v failed: already exists", TypeIdOf[T]().String(), key)
 }
 
 // RegisterAny register a T(specified by typeIdStr) instance into Type's instances cache, if exists return error
@@ -606,7 +605,7 @@ func getInstancesCache[T any](tag string, registerType bool, opts ...TypeOption)
 			}
 			typ = GetType[T](opts...)
 		} else {
-			return nil, NewNotFoundError(fmt.Sprintf("type %s not found", GetTypeIdString[T]()))
+			return nil, NewNotFoundError(fmt.Sprintf("type %s not found", TypeIdOf[T]().String()))
 		}
 	}
 	typ.lock.RLock()
@@ -630,33 +629,6 @@ func getInstancesCacheAny(typeIdStr, tag string, opts ...TypeOption) (SetterCach
 		return nil, fmt.Errorf("invalid type %s instances cache type: %T", typ.String(), typ.instancesCache[tag])
 	}
 	return cache, nil
-}
-
-// GetTypeId return reflect type of T as TypeId
-func GetTypeId[T any]() reflect.Type {
-	return reflect.TypeOf(new(T)).Elem()
-}
-
-// GetTypeIdString return string representation of reflect type of T
-// TODO: Uniqueness proof!
-func GetTypeIdString[T any]() string {
-	return typeIdString(reflect.TypeOf(new(T)).Elem())
-}
-
-func typeIdString(rtype reflect.Type) string {
-	pkgPath := typeIdPkgPath(rtype)
-	i := strings.LastIndex(pkgPath, "/")
-	if pkgPath == "" || i < 0 {
-		return rtype.String()
-	}
-	return pkgPath[:i+1] + rtype.String()
-}
-
-func typeIdPkgPath(rtype reflect.Type) string {
-	t := rtype
-	for ; t.Kind() == reflect.Ptr; t = t.Elem() {
-	}
-	return t.PkgPath()
 }
 
 // TypeMap a map[TypeId]*Type, with type meta info and instances in *Type

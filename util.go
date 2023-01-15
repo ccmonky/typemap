@@ -7,7 +7,7 @@ import (
 // Zero create a new T's instance, and New will indirect reflect.Ptr recursively to ensure not return nil pointer
 func Zero[T any]() T {
 	var level int
-	typ := GetTypeId[T]()
+	typ := TypeOf[T]()
 	for ; typ.Kind() == reflect.Ptr; typ = typ.Elem() {
 		level++
 	}
@@ -26,7 +26,7 @@ func Zero[T any]() T {
 // New create a new T's instance pointer, and New will indirect reflect.Ptr recursively to ensure not return nil pointer
 func New[T any]() *T {
 	var level int
-	typ := GetTypeId[T]()
+	typ := TypeOf[T]()
 	for ; typ.Kind() == reflect.Ptr; typ = typ.Elem() {
 		level++
 	}

@@ -54,7 +54,7 @@ func testSetAPI(t *testing.T) {
 	defer ts.Close()
 	rp, err := http.Post(ts.URL, "application/json", bytes.NewReader([]byte(`[
 		{
-			"type_id": "github.com/ccmonky/*typemap_test.InstanceTest",
+			"type_id": "github.com/ccmonky/typemap_test:*typemap_test.InstanceTest",
 			"name": "first",
 			"value": {
 				"int": 1,
@@ -62,7 +62,7 @@ func testSetAPI(t *testing.T) {
 			}
 		},
 		{
-			"type_id": "github.com/ccmonky/*typemap_test.InstanceTest",
+			"type_id": "github.com/ccmonky/typemap_test:*typemap_test.InstanceTest",
 			"name": "second",
 			"value": {
 				"int": 2,
@@ -70,7 +70,7 @@ func testSetAPI(t *testing.T) {
 			}
 		},
 		{
-			"type_id": "github.com/ccmonky/*typemap_test.InstanceTest",
+			"type_id": "github.com/ccmonky/typemap_test:*typemap_test.InstanceTest",
 			"name": "first",
 			"value": {
 				"int": 3,
@@ -115,11 +115,11 @@ func testGetAPI(t *testing.T) {
 	defer ts.Close()
 	rp, err := http.Post(ts.URL, "application/json", bytes.NewReader([]byte(`[
 		{
-			"type_id": "github.com/ccmonky/*typemap_test.InstanceTest",
+			"type_id": "github.com/ccmonky/typemap_test:*typemap_test.InstanceTest",
 			"name": "first"
 		},
 		{
-			"type_id": "github.com/ccmonky/*typemap_test.InstanceTest",
+			"type_id": "github.com/ccmonky/typemap_test:*typemap_test.InstanceTest",
 			"name": "second"
 		}
 	]`)))
@@ -169,11 +169,11 @@ func testDeleteAPI(t *testing.T) {
 	defer ts.Close()
 	rp, err := http.Post(ts.URL, "application/json", bytes.NewReader([]byte(`[
 		{
-			"type_id": "github.com/ccmonky/*typemap_test.InstanceTest",
+			"type_id": "github.com/ccmonky/typemap_test:*typemap_test.InstanceTest",
 			"name": "first"
 		},
 		{
-			"type_id": "github.com/ccmonky/*typemap_test.InstanceTest",
+			"type_id": "github.com/ccmonky/typemap_test:*typemap_test.InstanceTest",
 			"name": "second"
 		}
 	]`)))
