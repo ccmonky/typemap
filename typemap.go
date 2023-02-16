@@ -83,7 +83,7 @@ func RegisterType[T any](opts ...TypeOption) error {
 	if needSetType {
 		typeMap.lock.Lock()
 		defer typeMap.lock.Unlock()
-		return setType[T](typeMap, typ)
+		return setType[T](typeMap, typ, opts...)
 	}
 	return nil
 }
@@ -113,18 +113,18 @@ func SetType[T any](opts ...TypeOption) error {
 		dependencies:   options.Dependencies,
 		description:    options.Description,
 	}
-	return setType[T](typeMap, typ)
+	return setType[T](typeMap, typ, opts...)
 }
 
-func setType[T any](typeMap *TypeMap, typ *Type) error {
+func setType[T any](typeMap *TypeMap, typ *Type, opts ...TypeOption) error {
 	typ.lock.Lock()
 	if typ.instancesCache == nil {
 		typ.instancesCache = make(map[string]any)
-		typ.instancesCache[""] = NewDefaultCache[T]() // NOTE: default tag is ""
+		typ.instancesCache[""] = NewDefaultCache[T](opts...) // NOTE: default tag is ""
 	}
 	for tag, tagCache := range typ.instancesCache {
 		if tagCache == nil {
-			typ.instancesCache[tag] = NewDefaultCache[T]()
+			typ.instancesCache[tag] = NewDefaultCache[T](opts...)
 		}
 	}
 	typ.lock.Unlock()
@@ -273,6 +273,7 @@ type TypeOptions struct {
 	Description     string
 	UseDependencies bool
 	UseDescription  bool
+	EnableDI        bool
 }
 
 // Options control option func for TypeMap's type api, RegisterType|SetType
@@ -294,7 +295,7 @@ func WithInstancesCache[T any](tag string, tagCache cache.SetterCacheInterface[T
 		if tagCache != nil {
 			options.InstancesCache[tag] = tagCache
 		} else {
-			options.InstancesCache[tag] = NewDefaultCache[T]()
+			options.InstancesCache[tag] = NewDefaultCache[T](WithEnableDI(options.EnableDI))
 		}
 	}
 }
@@ -312,6 +313,13 @@ func WithDescription(description string) TypeOption {
 	return func(options *TypeOptions) {
 		options.UseDescription = true
 		options.Description = description
+	}
+}
+
+// WithEnableDI specify EnableDI
+func WithEnableDI(enable bool) TypeOption {
+	return func(options *TypeOptions) {
+		options.EnableDI = enable
 	}
 }
 

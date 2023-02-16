@@ -22,24 +22,27 @@ const (
 // - if T implements `DefaultLoader`, returns a `cache.NewLoadable` with LoadDefault as LoadFunction
 // - if T implements `Default`, returns a `cache.NewLoadable` with Default as LoadFunction
 // - otherwise, return a `cache.New`
-func NewDefaultCache[T any]() cache.SetterCacheInterface[T] {
+func NewDefaultCache[T any](opts ...TypeOption) cache.SetterCacheInterface[T] {
+	var sci cache.SetterCacheInterface[T]
 	var value any = Zero[T]()
-	if loader, ok := value.(Loadable[T]); ok {
-		return NewLoadable[T](loader.Load, cache.New[T](NewMap()))
-	}
-	if defLoader, ok := value.(DefaultLoader[T]); ok {
-		return NewLoadable[T](defLoader.LoadDefault, cache.New[T](NewMap()))
-	}
-	if def, ok := value.(Default[T]); ok {
+	switch t := value.(type) {
+	case Loadable[T]:
+		sci = NewLoadable[T](t.Load, cache.New[T](NewMap()))
+	case DefaultLoader[T]:
+		sci = NewLoadable[T](t.LoadDefault, cache.New[T](NewMap()))
+	case Default[T]:
 		loader := func(ctx context.Context, key any) (T, error) {
-			return def.Default(), nil
+			return t.Default(), nil
 		}
-		return NewLoadable[T](loader, cache.New[T](NewMap()))
+		sci = NewLoadable[T](loader, cache.New[T](NewMap()))
+	default:
+		sci = NewCacheAny[T](NewMap())
 	}
-	if Container() != nil {
-		return NewLoadable[T](LoadFuncOfDAG[T](Container()), cache.New[T](NewMap()))
+	options := NewTypeOptions(opts...)
+	if Container() != nil && options.EnableDI {
+		sci = NewLoadable[T](LoadFuncOfDAG[T](Container()), sci)
 	}
-	return NewCacheAny[T](NewMap())
+	return sci
 }
 
 // CacheAny represents a setter cache and implements SetterAnyCacheInterface

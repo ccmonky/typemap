@@ -166,7 +166,7 @@ func TestNewDefaultCacheContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 	typemap.SetContainer(c)
-	err = typemap.RegisterType[*log.Logger]()
+	err = typemap.RegisterType[*log.Logger](typemap.WithEnableDI(true))
 	if err != nil {
 		t.Fatal(err)
 	}
