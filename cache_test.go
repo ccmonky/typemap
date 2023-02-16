@@ -2,10 +2,15 @@ package typemap_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/ccmonky/typemap"
+	"go.uber.org/dig"
 )
 
 type DefaultType struct {
@@ -139,4 +144,41 @@ func TestNewDefaultCacheImplLoadable(t *testing.T) {
 	if err == nil {
 		t.Fatal("should error")
 	}
+}
+
+func TestNewDefaultCacheContainer(t *testing.T) {
+	type Config struct {
+		Prefix string
+	}
+	c := dig.New()
+	err := c.Provide(func() (*Config, error) {
+		var cfg Config
+		err := json.Unmarshal([]byte(`{"prefix": "[foo] "}`), &cfg)
+		return &cfg, err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = c.Provide(func(cfg *Config) *log.Logger {
+		return log.New(os.Stdout, cfg.Prefix, 0)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	typemap.SetContainer(c)
+	err = typemap.RegisterType[*log.Logger]()
+	if err != nil {
+		t.Fatal(err)
+	}
+	logger, err := typemap.Get[*log.Logger](context.TODO(), "mylogger")
+	if err != nil {
+		t.Fatal(err)
+	}
+	logger.Print("You've been invoked hahaah")
+	time.Sleep(10 * time.Millisecond)
+	logger, err = typemap.Get[*log.Logger](context.TODO(), "mylogger")
+	if err != nil {
+		t.Fatal(err)
+	}
+	logger.Print("You've been invoked hahaah")
 }

@@ -36,6 +36,9 @@ func NewDefaultCache[T any]() cache.SetterCacheInterface[T] {
 		}
 		return NewLoadable[T](loader, cache.New[T](NewMap()))
 	}
+	if Container() != nil {
+		return NewLoadable[T](LoadFuncOfDAG[T](Container()), cache.New[T](NewMap()))
+	}
 	return NewCacheAny[T](NewMap())
 }
 
