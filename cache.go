@@ -21,6 +21,7 @@ const (
 // - if T implements `Loadable`, returns a `cache.NewLoadable` with Load as LoadFunction
 // - if T implements `DefaultLoader`, returns a `cache.NewLoadable` with LoadDefault as LoadFunction
 // - if T implements `Default`, returns a `cache.NewLoadable` with Default as LoadFunction
+// - if Container() != nil && EnableDI, then use the `Container.Invoke`
 // - otherwise, return a `cache.New`
 func NewDefaultCache[T any](opts ...TypeOption) cache.SetterCacheInterface[T] {
 	var sci cache.SetterCacheInterface[T]

@@ -10,8 +10,11 @@ import (
 type Action string
 
 var (
+	// RegisterAction means execute `typemap.Register`
 	RegisterAction Action = "register"
-	SetAction      Action = "set"
+
+	// SetAction means execute `typemap.Set`
+	SetAction Action = "set"
 )
 
 // Reg used as a field that will set its name & value into instances map of T in typemap
@@ -20,6 +23,40 @@ type Reg[T any] struct {
 	Value T      `json:"value"`
 	// Action is the action used to set intance of T, available values are: ["register", "set"], default is "set"
 	Action Action `json:"action,omitempty"`
+}
+
+// NewReg create a new `*Reg[T]` used to register value with name
+// e.g. `NewReg[http.HandlerFunc]("trace", fn).SetAction(typemap.SetAction).Register(ctx)`
+func NewReg[T any](name string, value T) *Reg[T] {
+	r := Reg[T]{
+		Name:  name,
+		Value: value,
+	}
+	return &r
+}
+
+// SetAction set action
+// NOTE: not concurrent safe
+func (r *Reg[T]) SetAction(action Action) {
+	r.Action = action
+}
+
+// SetValue set value
+// NOTE: not concurrent safe
+func (r *Reg[T]) SetValue(value T) {
+	r.Value = value
+}
+
+// Register execute the register(or set) the value into instances store
+func (r *Reg[T]) Register(ctx context.Context) error {
+	var err error
+	switch r.Action {
+	case RegisterAction:
+		err = Register(ctx, r.Name, r.Value)
+	default:
+		err = Set(ctx, r.Name, r.Value)
+	}
+	return err
 }
 
 // UnmarshalJSON custom unmarshal to support automatic register T's intance into typemamp

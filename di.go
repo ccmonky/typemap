@@ -8,6 +8,44 @@ import (
 	"go.uber.org/dig"
 )
 
+// LoadFuncOfDAG convert a DAG to `cache.LoadFunction`,
+// used to `typemap.Get` a value which was injected by `dag.Provide` while not `typemap.Register`,
+// usually use with an dig/fx app which has completed the the provides.
+func LoadFuncOfDAG[T any](dag DAG) cache.LoadFunction[T] {
+	loader := func(ctx context.Context, key any) (T, error) {
+		var value T
+		err := dag.Invoke(func(v T) {
+			value = v
+		})
+		return value, err
+	}
+	return loader
+}
+
+// Provide call `Provide` method of global container(created one if nil)
+func Provide(constructor interface{}, opts ...dig.ProvideOption) error {
+	if Container() == nil {
+		SetContainer(dig.New())
+	}
+	return Container().Provide(constructor, opts...)
+}
+
+// Invoke call `Invoke` method of global container(created one if nil)
+func Invoke(function interface{}, opts ...dig.InvokeOption) error {
+	if Container() == nil {
+		SetContainer(dig.New())
+	}
+	return Container().Invoke(function, opts...)
+}
+
+// Decorate call `Decorate` method of global container(created one if nil)
+func Decorate(decorator interface{}, opts ...dig.DecorateOption) error {
+	if Container() == nil {
+		SetContainer(dig.New())
+	}
+	return Container().Decorate(decorator, opts...)
+}
+
 // SetContainer set a dig container to the global container(e.g., *dig.Container or *dig.Scope)
 func SetContainer(dag DAG) {
 	gclock.Lock()
@@ -69,18 +107,6 @@ func (c *container) Provide(constructor interface{}, opts ...dig.ProvideOption) 
 
 func (c *container) String() string {
 	return c.dag.String()
-}
-
-// LoadFuncOfDAG convert a DAG to cache.LoadFunction
-func LoadFuncOfDAG[T any](dag DAG) cache.LoadFunction[T] {
-	loader := func(ctx context.Context, key any) (T, error) {
-		var value T
-		err := dag.Invoke(func(v T) {
-			value = v
-		})
-		return value, err
-	}
-	return loader
 }
 
 var (

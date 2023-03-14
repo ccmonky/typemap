@@ -26,23 +26,46 @@ type Ref[T any] struct {
 	ValueCache[T]
 }
 
+// NewRef create a new `*Ref[T]` and execute the reference
+// e.g. `NewRef[http.HandlerFunc]("trace").SetCache(true).Reference(ctx)`
+func NewRef[T any](name string) *Ref[T] {
+	r := Ref[T]{
+		Name: name,
+		ValueCache: ValueCache[T]{
+			lock: new(sync.RWMutex),
+		},
+	}
+	return &r
+}
+
+// SetCache set cache
+// NOTE: not concurrent safe
+func (r *Ref[T]) SetCache(cache bool) {
+	r.ValueCache.Cache = cache
+}
+
+// Reference execute the reference the value according name
+func (r *Ref[T]) Reference(ctx context.Context) error {
+	value, err := Get[T](ctx, r.Name)
+	if err != nil {
+		return fmt.Errorf("get Ref[%T] %s failed: %v", *new(T), r.Name, err)
+	}
+	r.ValueCache.setValue(value)
+	return err
+}
+
 // UnmarshalJSON custom unmarshal to support simple form(just a string which is a instance name of T)
 func (r *Ref[T]) UnmarshalJSON(b []byte) error {
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultUnmarshalTimeout)
 	defer cancel()
 	if b[0] == '"' && b[len(b)-1] == '"' { // NOTE: simple form
 		r.Name = string(b[1 : len(b)-1])
-		r.ValueCache = ValueCache[T]{
-			Cache: true, // NOTE: simple form always cache
-		}
+		r.ValueCache.Cache = true // NOTE: simple form always cache
 		v, err := Get[T](ctx, r.Name)
 		if err != nil {
 			return fmt.Errorf("get Ref[%T] %s failed: %v", *new(T), string(b), err)
 		}
-		r.ValueCache.lock.Lock()
-		r.ValueCache.cached = true
-		r.ValueCache.value = v
-		r.ValueCache.lock.Unlock()
+		r.ValueCache.setValue(v)
 	} else { // NOTE: normal form
 		helper := &refSerdeHelper{}
 		err := json.Unmarshal(b, helper)
@@ -55,12 +78,7 @@ func (r *Ref[T]) UnmarshalJSON(b []byte) error {
 		if err != nil {
 			return fmt.Errorf("get Ref[%T] %s failed: %v", *new(T), string(b), err)
 		}
-		if r.ValueCache.Cache {
-			r.ValueCache.lock.Lock()
-			r.ValueCache.cached = true
-			r.ValueCache.value = v
-			r.ValueCache.lock.Unlock()
-		}
+		r.ValueCache.setValue(v)
 	}
 	return nil
 }
@@ -124,12 +142,7 @@ func (ra *RefAttr[T, A]) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return fmt.Errorf("get RefAttr[%T, %T] attr %s failed: %v", *new(T), *new(A), ra.Attr, err)
 	}
-	if ra.ValueCache.Cache {
-		ra.ValueCache.lock.Lock()
-		ra.ValueCache.cached = true
-		ra.ValueCache.value = av
-		ra.ValueCache.lock.Unlock()
-	}
+	ra.ValueCache.setValue(av)
 	return nil
 }
 
@@ -163,10 +176,26 @@ type ValueCache[T any] struct {
 
 	value  T
 	cached bool
-	lock   sync.RWMutex
+	lock   *sync.RWMutex
+}
+
+func (vc *ValueCache[T]) setValue(value T) {
+	if !vc.Cache {
+		return
+	}
+	if vc.lock == nil {
+		vc.lock = new(sync.RWMutex)
+	}
+	vc.lock.Lock()
+	defer vc.lock.Unlock()
+	vc.value = value
+	vc.cached = true
 }
 
 func (vc *ValueCache[T]) Value(loadFunc func() (T, error)) (T, error) {
+	if vc.lock == nil {
+		vc.lock = new(sync.RWMutex)
+	}
 	if vc.Cache {
 		vc.lock.RLock()
 		if vc.cached {
